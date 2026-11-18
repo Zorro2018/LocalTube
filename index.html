@@ -20,7 +20,7 @@
   <!-- Hidden Offscreen Video for Live Timeline Frame Thumbnail Extraction -->
   <video id="previewVideo" muted playsinline preload="metadata" crossorigin="anonymous" class="hidden"></video>
 
-  <!-- Hidden Universal Folder, File & JSON Import Inputs -->
+  <!-- Hidden Universal Folder, File & Catalog Import Inputs -->
   <input id="dirInput" type="file" webkitdirectory directory multiple class="hidden" />
   <input id="fileInput" type="file" accept="video/*,.mkv,.mp4,.webm,.mov,.avi" multiple class="hidden" />
   <input id="importJsonInput" type="file" accept=".json,application/json" class="hidden" />
@@ -36,7 +36,7 @@
         <span class="font-bold text-lg tracking-tight">LocalTube</span>
       </div>
       <button id="privacyBadgeBtn" class="hidden sm:inline-flex items-center gap-1.5 text-[11px] bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-full font-semibold transition">
-        🔒 100% Local Privacy • Shared Disk Cache
+        🔒 100% Private • Saved on Your Computer
       </button>
     </div>
 
@@ -50,7 +50,7 @@
     <div class="flex items-center gap-2">
       <span id="scanStatusBadge" class="hidden text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full animate-pulse"></span>
       <button id="openFolderModalBtn" class="bg-[#272727] hover:bg-[#383838] text-xs sm:text-sm font-medium px-3.5 py-1.5 rounded-full transition">
-        + Local Repository (<span id="folderCountBadge">0</span>)
+        + My Video Folders (<span id="folderCountBadge">0</span>)
       </button>
     </div>
   </header>
@@ -63,8 +63,8 @@
 
         <div class="border-t border-white/10 pt-4">
           <div class="flex items-center justify-between px-3 mb-2">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Local PC Folders</span>
-            <button id="sidebarAddFolderBtn" class="text-[11px] text-red-400 hover:underline">+ Link</button>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Video Folders</span>
+            <button id="sidebarAddFolderBtn" class="text-[11px] text-red-400 hover:underline">+ Add</button>
           </div>
           <div id="sidebarFoldersList" class="space-y-1"></div>
         </div>
@@ -80,7 +80,7 @@
 
       <div class="border-t border-white/10 pt-4 px-3 pb-1 text-[11px] text-zinc-400 space-y-1.5">
         <div class="bg-[#161616] border border-white/5 rounded-lg p-2 text-[10px] text-zinc-400">
-          <span class="text-emerald-400 font-semibold">🔒 Local-First:</span> Videos &amp; shared index stay 100% on your PC.
+          <span class="text-emerald-400 font-semibold">🔒 100% Private:</span> Your videos &amp; catalog stay on your Mac or PC.
         </div>
         <div>Created by <span class="text-white font-semibold">Victor Chowdhury</span></div>
         <a href="https://www.victorbuildsai.com/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 text-red-400 hover:text-red-300 hover:underline font-medium">
@@ -118,9 +118,9 @@
 
               <!-- 1-Click Permission Re-Grant Overlay -->
               <div id="handlePermissionOverlay" class="hidden absolute inset-0 z-30 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center space-y-3">
-                <div class="text-amber-400 text-sm font-bold">🔒 Local PC Folder Permission Required for This Session</div>
+                <div class="text-amber-400 text-sm font-bold">🔒 Local Folder Access Needed for This Session</div>
                 <button id="grantHandleOverlayBtn" class="bg-[#ff0000] hover:bg-red-600 text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-lg">
-                  ⚡ Unlock Local Folder &amp; Play Immediately
+                  ⚡ Unlock Folder &amp; Play Immediately
                 </button>
               </div>
 
@@ -273,61 +273,75 @@
     </main>
   </div>
 
-  <!-- Modal 1: Local Repository & Cross-Browser Cache Manager -->
+  <!-- Modal 1: Simple Video Folders & Catalog Manager -->
   <div id="folderModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="bg-[#181818] border border-white/15 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between border-b border-white/10 pb-3">
         <div>
-          <h2 class="text-base font-bold">Local Video Repository &amp; Cross-Browser On-Disk Cache</h2>
-          <p class="text-[11px] text-zinc-400">Videos stay 100% on your PC. Shared cache file (<code class="text-emerald-400">localtube_index_cache.json</code>) works across all browsers.</p>
+          <h2 class="text-base font-bold">My Video Folders &amp; Saved Catalog</h2>
+          <p class="text-[11px] text-zinc-400">Your catalog is automatically saved to your computer so you can open LocalTube in any browser on your Mac or Windows PC without waiting for videos to reload.</p>
         </div>
         <button id="closeFolderModalBtn" class="text-zinc-400 hover:text-white text-lg">✕</button>
       </div>
 
       <label class="flex items-center justify-between bg-[#121212] border border-white/10 rounded-xl p-3 cursor-pointer">
         <div class="pr-3">
-          <div class="text-xs font-bold text-white">Cache Video Blobs in Local IndexedDB (Instant Playback)</div>
-          <div class="text-[11px] text-zinc-400">Stores playable file blobs in your browser DB so videos play immediately on reload.</div>
+          <div class="text-xs font-bold text-white">Remember Videos for Instant Playback</div>
+          <div class="text-[11px] text-zinc-400">Keeps your linked videos ready to play immediately whenever you open LocalTube.</div>
         </div>
         <input id="cacheToggleCheckbox" type="checkbox" checked class="w-4 h-4 accent-red-600" />
       </label>
 
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         <button id="modalNativeHandleBtn" type="button" class="bg-[#ff0000] hover:bg-red-600 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition shadow-lg">
-          ⚡ Link &amp; Write Disk Cache
+          📁 + Add Video Folder (Auto-Sync)
         </button>
         <button id="modalPickFolderBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition">
-          📁 + Select Folder (Reads Cache)
+          📂 + Add Folder (Standard)
         </button>
         <button id="modalPickFilesBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition">
-          🎬 + Add Video Files
+          🎬 + Add Individual Videos
         </button>
       </div>
 
       <div class="bg-blue-950/30 border border-blue-500/30 rounded-xl p-3.5 text-xs space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="font-bold text-blue-300">🔄 Cross-Browser Shared Cache (<code class="text-white">localtube_index_cache.json</code>)</span>
-          <span id="crossBrowserStatusPill" class="text-[10px] bg-blue-500/20 text-blue-200 px-2 py-0.5 rounded-full font-semibold">Auto-Sync Active</span>
+          <span class="font-bold text-blue-300">💻 Use Across Any Browser on Your Mac or PC</span>
+          <span id="crossBrowserStatusPill" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">Auto-Saved to Computer</span>
         </div>
         <p class="text-zinc-300 text-[11px]">
-          Writes and reads <code class="text-blue-300">localtube_index_cache.json</code> directly inside your video folder so Chrome, Edge, Firefox, and Brave share thumbnails, actors, likes, and watch progress without re-indexing.
+          LocalTube automatically saves your catalog inside your video folder (and to your computer). If you switch to another browser like Safari, Firefox, Chrome, or Edge, your thumbnails, actors, likes, and watch progress load automatically.
         </p>
         <div class="flex flex-wrap items-center gap-2 pt-1">
           <button id="saveDiskCacheToFoldersBtn" type="button" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-1.5 rounded-lg text-[11px]">
-            💾 Save Shared Cache to Folder
-          </button>
-          <button id="exportIndexBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-zinc-200 px-3 py-1.5 rounded-lg text-[11px]">
-            ⬇ Download localtube_index_cache.json
+            💾 Save Catalog to Computer Now
           </button>
           <button id="importIndexBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-zinc-200 px-3 py-1.5 rounded-lg text-[11px]">
-            ⬆ Load Cache File (.json)
+            📂 Load Saved Catalog from Computer
           </button>
         </div>
       </div>
 
       <div>
-        <div class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Linked Local Folders</div>
+        <div class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Connected Video Folders</div>
         <div id="modalFolderList" class="space-y-2 max-h-48 overflow-y-auto"></div>
+      </div>
+
+      <!-- Clear Saved Catalog / Reset Section -->
+      <div class="border-t border-white/10 pt-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="text-[11px] text-zinc-400">
+          Want a fresh start? Clear your saved catalog, thumbnails, and watch history.
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="clearCatalogBtn" type="button" class="bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/30 px-3 py-1.5 rounded-lg text-xs font-semibold transition">
+            🗑 Clear Saved Catalog
+          </button>
+          <div id="clearConfirmBox" class="hidden flex items-center gap-1.5 bg-red-950/60 border border-red-500/40 px-2.5 py-1 rounded-lg">
+            <span class="text-[11px] text-red-200 font-semibold">Clear all saved data?</span>
+            <button id="confirmClearYesBtn" type="button" class="bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold px-2 py-0.5 rounded">Yes, Clear</button>
+            <button id="confirmClearNoBtn" type="button" class="bg-[#272727] text-zinc-300 text-[11px] px-2 py-0.5 rounded">Cancel</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -336,7 +350,7 @@
   <div id="editModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
     <form id="editForm" class="bg-[#181818] border border-white/15 rounded-2xl max-w-md w-full p-6 space-y-4">
       <div class="flex items-center justify-between border-b border-white/10 pb-3">
-        <h3 class="text-base font-bold">Edit Video Metadata</h3>
+        <h3 class="text-base font-bold">Edit Video Info</h3>
         <button id="closeEditModalBtn" type="button" class="text-zinc-400 hover:text-white">✕</button>
       </div>
       <div class="space-y-3 text-xs">
@@ -413,6 +427,7 @@
           const tx = db.transaction(store, 'readwrite');
           tx.objectStore(store).delete(id);
           tx.oncomplete = () => res();
+          tx.onerror = () => res();
         });
       } catch (e) {}
     }
@@ -489,8 +504,8 @@
     };
 
     const INITIAL_FOLDERS = [
-      { id: 'folder-demo-1', name: 'Movies_4K (Sample)', path: 'Local Browser Demo Cache', status: 'Ready (Local Demo)' },
-      { id: 'folder-demo-2', name: 'Clips_And_Tutorials (Sample)', path: 'Local Browser Demo Cache', status: 'Ready (Local Demo)' }
+      { id: 'folder-demo-1', name: 'Movies_4K (Sample)', path: 'Sample Library', status: 'Saved on Computer' },
+      { id: 'folder-demo-2', name: 'Clips_And_Tutorials (Sample)', path: 'Sample Library', status: 'Saved on Computer' }
     ];
 
     function createInitialDemoVideos() {
@@ -503,7 +518,6 @@
       return list.map(v => ({ ...v, thumbnailUrl: generateProceduralThumbnail(v.title, v.category, v.actors, v.resolution, v.accent) }));
     }
 
-    // Cross-Browser Shared On-Disk Cache Helpers
     function buildSerializableCachePayload(filterFolderId = null) {
       const fList = filterFolderId ? state.folders.filter(f => f.id === filterFolderId) : state.folders;
       const vList = filterFolderId ? state.videos.filter(v => v.folderId === filterFolderId) : state.videos;
@@ -545,11 +559,52 @@
     function scheduleCrossBrowserSync() {
       clearTimeout(syncTimer);
       syncTimer = setTimeout(async () => {
+        const payload = buildSerializableCachePayload();
+        try {
+          localStorage.setItem('LocalTube_Catalog_Backup', JSON.stringify(payload));
+        } catch (e) {}
         for (const f of state.folders) { if (f.dirHandle) await writeDiskCacheToDirectoryHandle(f.dirHandle, f.id, false); }
         try {
-          await fetch(LOCAL_BRIDGE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildSerializableCachePayload()) });
+          await fetch(LOCAL_BRIDGE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         } catch (e) {}
-      }, 600);
+      }, 450);
+    }
+
+    async function clearAllSavedCatalog() {
+      try {
+        const db = await openDB();
+        await new Promise((res) => {
+          const tx = db.transaction(['videos', 'folders'], 'readwrite');
+          tx.objectStore('videos').clear();
+          tx.objectStore('folders').clear();
+          tx.oncomplete = () => res();
+          tx.onerror = () => res();
+        });
+      } catch (e) {}
+      try { localStorage.removeItem('LocalTube_Catalog_Backup'); } catch (e) {}
+      for (const f of state.folders) {
+        if (f.dirHandle) {
+          try { await f.dirHandle.removeEntry(SHARED_CACHE_FILENAME); } catch (e) {}
+        }
+      }
+      try {
+        await fetch(LOCAL_BRIDGE_URL, { method: 'DELETE' });
+      } catch (e) {}
+
+      mainVideo.pause();
+      mainVideo.removeAttribute('src');
+      state.activeVideo = null;
+      state.playerMode = 'hidden';
+      state.selectedActor = null;
+      state.selectedFolderId = null;
+      state.selectedCategory = 'All';
+      state.frameCache.clear();
+      state.folders = [];
+      state.videos = [];
+      document.getElementById('clearConfirmBox').classList.add('hidden');
+      document.getElementById('clearCatalogBtn').classList.remove('hidden');
+      renderAll();
+      showToast('Saved catalog and history have been cleared.');
     }
 
     function computeRecommendations() {
@@ -940,10 +995,10 @@
 
       // Recommendations Shelf
       const recShelf = document.getElementById('recommendedShelf');
-      if (state.navSection === 'all' && !state.selectedActor && state.selectedCategory === 'All' && !state.searchQuery) {
+      if (state.navSection === 'all' && !state.selectedActor && state.selectedCategory === 'All' && !state.searchQuery && state.videos.length > 0) {
         recShelf.classList.remove('hidden');
         document.getElementById('recStatsBadge').textContent = `${recData.totalPlays} Plays • ${Math.round(recData.totalWatchSec / 60)} Mins Watched`;
-        document.getElementById('recSubtitle').textContent = `Ranked locally from your Likes, play count, and watch duration.${recData.topActors.length ? ' Top Cast: ' + recData.topActors.slice(0, 3).join(', ') : ''}`;
+        document.getElementById('recSubtitle').textContent = `Ranked automatically from your Likes, play count, and watch duration.${recData.topActors.length ? ' Top Cast: ' + recData.topActors.slice(0, 3).join(', ') : ''}`;
         const recGrid = document.getElementById('recommendedGrid'); recGrid.innerHTML = '';
         [...state.videos].filter(v => v.reaction !== 'dislike').sort((a, b) => (recData.meta[b.id]?.rawScore || 0) - (recData.meta[a.id]?.rawScore || 0)).slice(0, 4).forEach(video => {
           const rm = recData.meta[video.id];
@@ -1017,7 +1072,7 @@
       renderPlayerLayout();
     }
 
-    // Folder Linking & Cross-Browser Cache Reading/Writing
+    // Folder Linking & Automatic Computer-Wide Catalog Sync
     async function walkNativeDirectoryHandle(dirHandle, parentName = '', depth = 4) {
       if (depth < 0) return [];
       const results = [];
@@ -1037,7 +1092,7 @@
 
         const folderName = dirHandle.name, folderId = `folder_handle_${folderName.replace(/[^a-zA-Z0-9]/g, '_')}`;
         const badge = document.getElementById('scanStatusBadge'); badge.classList.remove('hidden');
-        badge.textContent = `Checking shared cache in "${folderName}"...`;
+        badge.textContent = `Checking saved catalog in "${folderName}"...`;
 
         const diskCache = await readDiskCacheFromDirectoryHandle(dirHandle);
         const diskMap = new Map();
@@ -1055,7 +1110,7 @@
             const restored = { ...cached, id: vidId, folderId, fileName: item.name, fileHandle: item.fileHandle, videoUrl: blobUrl };
             await dbPut('videos', restored); indexed.push(restored);
           } else {
-            badge.textContent = `Indexing (${i + 1}/${entries.length}): ${item.name}`;
+            badge.textContent = `Adding (${i + 1}/${entries.length}): ${item.name}`;
             const parsed = parseVideoFilename(item.name, item.parentDir);
             const media = await extractVideoMediaInfo(blobUrl);
             const vidObj = {
@@ -1070,14 +1125,14 @@
           }
         }
 
-        const folderRec = { id: folderId, name: folderName, path: `Local Handle :: ${folderName} (${indexed.length} videos)`, status: 'Shared On-Disk Cache Active', dirHandle };
+        const folderRec = { id: folderId, name: folderName, path: `${folderName} (${indexed.length} videos)`, status: 'Auto-Saved to Computer', dirHandle };
         await dbPut('folders', folderRec);
         state.folders = [...state.folders.filter(f => f.id !== folderId), folderRec];
         state.videos = [...state.videos.filter(v => v.folderId !== folderId), ...indexed];
         await writeDiskCacheToDirectoryHandle(dirHandle, folderId, false);
         scheduleCrossBrowserSync();
         badge.classList.add('hidden');
-        showToast(reused > 0 ? `Reused ${reused} cached videos from ${SHARED_CACHE_FILENAME}!` : `Indexed ${indexed.length} videos & wrote ${SHARED_CACHE_FILENAME}!`);
+        showToast(reused > 0 ? `Loaded ${reused} videos from your saved catalog!` : `Added ${indexed.length} videos & saved catalog to your computer!`);
         renderAll();
       } catch (e) { document.getElementById('scanStatusBadge').classList.add('hidden'); }
     }
@@ -1105,45 +1160,86 @@
 
       const cacheBlobs = document.getElementById('cacheToggleCheckbox').checked;
       const firstRel = videoFiles[0].webkitRelativePath || '';
-      const folderName = firstRel.includes('/') ? firstRel.split('/')[0] : `PC_Folder_${state.folders.length + 1}`;
+      const folderName = firstRel.includes('/') ? firstRel.split('/')[0] : `Video_Folder_${state.folders.length + 1}`;
       const folderId = `folder_cached_${folderName.replace(/[^a-zA-Z0-9]/g, '_')}`;
       const badge = document.getElementById('scanStatusBadge'); badge.classList.remove('hidden');
 
       const newVideos = []; let reused = 0;
       for (let i = 0; i < videoFiles.length; i++) {
-        const file = videoFiles[i], blobUrl = URL.createObjectURL(file), cached = diskMap.get(file.name);
+        const file = videoFiles[i];
+        const blobUrl = URL.createObjectURL(file);
+        const cached = diskMap.get(file.name);
         if (cached && cached.thumbnailUrl) {
           reused++;
-          const vidObj = { ...cached, id: `${folderId}::${file.name}`, fileName: file.name, folderId, videoUrl: blobUrl, cachedFileBlob: cacheBlobs ? file : null };
-          await dbPut('videos', vidObj); newVideos.push(vidObj);
-        } else {
-          badge.textContent = `Caching (${i + 1}/${videoFiles.length}): ${file.name}`;
-          const parsed = parseVideoFilename(file.name, folderName), media = await extractVideoMediaInfo(blobUrl);
-          const vidObj = {
-            id: `${folderId}::${file.name}`, fileName: file.name, folderId, title: parsed.title, actors: parsed.actors,
-            category: parsed.category, videoType: parsed.category, resolution: parsed.resolution, duration: media.duration || 0,
-            playCount: 0, totalWatchedSeconds: 0, reaction: null, likesCount: 0, watchProgress: 0, lastPositionSeconds: 0,
-            thumbnailUrl: media.thumbnail || generateProceduralThumbnail(parsed.title, parsed.category, parsed.actors, parsed.resolution),
-            videoUrl: blobUrl, cachedFileBlob: cacheBlobs ? file : null
+          const restored = {
+            ...cached,
+            id: `${folderId}::${file.name}`,
+            folderId,
+            fileName: file.name,
+            videoUrl: blobUrl,
+            cachedFileBlob: cacheBlobs ? file : null
           };
-          await dbPut('videos', vidObj); newVideos.push(vidObj);
+          await dbPut('videos', restored);
+          newVideos.push(restored);
+        } else {
+          badge.textContent = `Adding (${i + 1}/${videoFiles.length}): ${file.name}`;
+          const parsed = parseVideoFilename(file.name, folderName);
+          const media = await extractVideoMediaInfo(blobUrl);
+          const vidObj = {
+            id: `${folderId}::${file.name}`,
+            folderId,
+            fileName: file.name,
+            title: parsed.title,
+            actors: parsed.actors,
+            category: parsed.category,
+            videoType: parsed.category,
+            resolution: parsed.resolution,
+            duration: media.duration || 0,
+            playCount: 0,
+            totalWatchedSeconds: 0,
+            reaction: null,
+            likesCount: 0,
+            watchProgress: 0,
+            lastPositionSeconds: 0,
+            thumbnailUrl: media.thumbnail || generateProceduralThumbnail(parsed.title, parsed.category, parsed.actors, parsed.resolution),
+            videoUrl: blobUrl,
+            cachedFileBlob: cacheBlobs ? file : null
+          };
+          await dbPut('videos', vidObj);
+          newVideos.push(vidObj);
         }
       }
 
-      const folderRec = { id: folderId, name: folderName, path: `Local Cache :: ${folderName} (${newVideos.length} videos)`, status: reused > 0 ? `Loaded ${reused} from ${SHARED_CACHE_FILENAME}` : 'Cached Locally' };
+      const folderRec = { id: folderId, name: folderName, path: `${folderName} (${newVideos.length} videos)`, status: reused > 0 ? 'Loaded from Saved Catalog' : 'Saved on Computer' };
       await dbPut('folders', folderRec);
       state.folders = [...state.folders.filter(f => f.id !== folderId), folderRec];
       state.videos = [...state.videos.filter(v => v.folderId !== folderId), ...newVideos];
       scheduleCrossBrowserSync();
       badge.classList.add('hidden'); e.target.value = '';
-      showToast(reused > 0 ? `Instant cross-browser load (${reused} videos)!` : `Cached ${newVideos.length} videos locally!`);
+      showToast(reused > 0 ? `Instant load (${reused} videos) from your saved catalog!` : `Added ${newVideos.length} videos & saved catalog!`);
       renderAll();
     }
 
-    function exportLocalIndexJson() {
-      const blob = new Blob([JSON.stringify(buildSerializableCachePayload(), null, 2)], { type: 'application/json' });
+    async function exportLocalIndexJson() {
+      const payloadStr = JSON.stringify(buildSerializableCachePayload(), null, 2);
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: SHARED_CACHE_FILENAME,
+            types: [{ description: 'LocalTube Catalog File', accept: { 'application/json': ['.json'] } }]
+          });
+          const w = await handle.createWritable();
+          await w.write(payloadStr);
+          await w.close();
+          showToast('Saved catalog to your computer! Any browser on your Mac or PC can load it.');
+          return;
+        } catch (e) {
+          if (e && e.name === 'AbortError') return;
+        }
+      }
+      const blob = new Blob([payloadStr], { type: 'application/json' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = SHARED_CACHE_FILENAME; a.click();
-      showToast(`Downloaded ${SHARED_CACHE_FILENAME} — place inside your video folder for instant cross-browser loading!`);
+      showToast('Saved catalog file to your computer!');
     }
 
     function importLocalIndexJson(e) {
@@ -1154,8 +1250,9 @@
           const data = JSON.parse(ev.target.result);
           if (Array.isArray(data.videos)) { for (const v of data.videos) await dbPut('videos', v); state.videos = data.videos; }
           if (Array.isArray(data.folders)) { for (const f of data.folders) await dbPut('folders', f); state.folders = data.folders; }
-          showToast('Loaded shared index cache!'); renderAll();
-        } catch (err) { showToast('Invalid JSON cache file.'); }
+          scheduleCrossBrowserSync();
+          showToast('Catalog loaded! Your videos, actors, and history are ready.'); renderAll();
+        } catch (err) { showToast('Could not read that catalog file.'); }
       };
       r.readAsText(file); e.target.value = '';
     }
@@ -1176,14 +1273,22 @@
     document.getElementById('modalNativeHandleBtn').onclick = handleLinkNativeFolder;
     document.getElementById('modalPickFolderBtn').onclick = () => document.getElementById('dirInput').click();
     document.getElementById('modalPickFilesBtn').onclick = () => document.getElementById('fileInput').click();
-    document.getElementById('exportIndexBtn').onclick = exportLocalIndexJson;
     document.getElementById('importIndexBtn').onclick = () => document.getElementById('importJsonInput').click();
     document.getElementById('privacyBadgeBtn').onclick = () => document.getElementById('folderModal').classList.remove('hidden');
     document.getElementById('saveDiskCacheToFoldersBtn').onclick = async () => {
       let ok = false;
       for (const f of state.folders) { if (f.dirHandle && await writeDiskCacheToDirectoryHandle(f.dirHandle, f.id, true)) ok = true; }
-      if (ok) showToast(`Saved ${SHARED_CACHE_FILENAME} directly to your linked folder!`); else exportLocalIndexJson();
+      if (ok) showToast('Catalog saved directly inside your video folder!'); else await exportLocalIndexJson();
     };
+    document.getElementById('clearCatalogBtn').onclick = () => {
+      document.getElementById('clearCatalogBtn').classList.add('hidden');
+      document.getElementById('clearConfirmBox').classList.remove('hidden');
+    };
+    document.getElementById('confirmClearNoBtn').onclick = () => {
+      document.getElementById('clearConfirmBox').classList.add('hidden');
+      document.getElementById('clearCatalogBtn').classList.remove('hidden');
+    };
+    document.getElementById('confirmClearYesBtn').onclick = clearAllSavedCatalog;
     document.getElementById('grantHandleOverlayBtn').onclick = async () => {
       if (state.activeVideo) await playVideoById(state.activeVideo.id, state.playerMode);
     };
@@ -1255,6 +1360,7 @@
         for (const f of state.folders) await dbPut('folders', f);
         for (const v of state.videos) await dbPut('videos', v);
       }
+      scheduleCrossBrowserSync();
       syncVolumeUI();
       renderAll();
     })();
