@@ -20,10 +20,9 @@
   <!-- Hidden Offscreen Video for Live Timeline Frame Thumbnail Extraction -->
   <video id="previewVideo" muted playsinline preload="metadata" crossorigin="anonymous" class="hidden"></video>
 
-  <!-- Hidden Universal Folder, File & Catalog Import Inputs -->
+  <!-- Hidden Universal Folder & File Inputs -->
   <input id="dirInput" type="file" webkitdirectory directory multiple class="hidden" />
   <input id="fileInput" type="file" accept="video/*,.mkv,.mp4,.webm,.mov,.avi" multiple class="hidden" />
-  <input id="importJsonInput" type="file" accept=".json,application/json" class="hidden" />
 
   <!-- Top Navbar -->
   <header class="sticky top-0 z-40 h-14 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10 px-4 flex items-center justify-between gap-3">
@@ -304,22 +303,14 @@
         </button>
       </div>
 
-      <div class="bg-blue-950/30 border border-blue-500/30 rounded-xl p-3.5 text-xs space-y-2">
+      <div class="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-3.5 text-xs space-y-1.5">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <span class="font-bold text-blue-300">💻 Use Across Any Browser on Your Mac or PC</span>
-          <span id="crossBrowserStatusPill" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">Auto-Saved to Computer</span>
+          <span class="font-bold text-emerald-300">✓ Automatic Catalog Discovery Across All Browsers</span>
+          <span id="crossBrowserStatusPill" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">Auto-Loaded from Default Location</span>
         </div>
         <p class="text-zinc-300 text-[11px]">
-          LocalTube automatically saves your catalog inside your video folder (and to your computer). If you switch to another browser like Safari, Firefox, Chrome, or Edge, your thumbnails, actors, likes, and watch progress load automatically.
+          When you build your catalog in any browser for the first time, LocalTube automatically saves it to your computer&apos;s default LocalTube location. Opening LocalTube in Safari, Chrome, Edge, Brave, or Firefox automatically finds and loads your catalog—you never have to locate a file.
         </p>
-        <div class="flex flex-wrap items-center gap-2 pt-1">
-          <button id="saveDiskCacheToFoldersBtn" type="button" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-3 py-1.5 rounded-lg text-[11px]">
-            💾 Save Catalog to Computer Now
-          </button>
-          <button id="importIndexBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-zinc-200 px-3 py-1.5 rounded-lg text-[11px]">
-            📂 Load Saved Catalog from Computer
-          </button>
-        </div>
       </div>
 
       <div>
@@ -380,7 +371,46 @@
     const DB_NAME = 'LocalTubeDB_v2';
     const SHARED_CACHE_FILENAME = 'localtube_index_cache.json';
     const LOCAL_BRIDGE_URL = 'http://localhost:8765/api/shared-cache';
+    const DEFAULT_RELATIVE_CATALOG_URL = './localtube_index_cache.json';
     const VIDEO_EXTS = ['.mp4', '.mkv', '.webm', '.mov', '.avi', '.m4v'];
+
+    // Default startup action: automatically find and load the catalog from the computer's default location
+    async function autoDiscoverDefaultComputerCatalog() {
+      // 1. Check the fixed default computer home location (~/.localtube/localtube_index_cache.json)
+      try {
+        const res = await fetch(LOCAL_BRIDGE_URL, { cache: 'no-store' });
+        if (res.ok) {
+          const shared = await res.json();
+          if (shared && Array.isArray(shared.videos) && shared.videos.length > 0) {
+            return shared;
+          }
+        }
+      } catch (e) {}
+
+      // 2. Check the default app folder location (./localtube_index_cache.json next to index.html)
+      try {
+        const relRes = await fetch(DEFAULT_RELATIVE_CATALOG_URL + '?t=' + Date.now(), { cache: 'no-store' });
+        if (relRes.ok) {
+          const relData = await relRes.json();
+          if (relData && Array.isArray(relData.videos) && relData.videos.length > 0) {
+            return relData;
+          }
+        }
+      } catch (e) {}
+
+      // 3. Check local storage backup
+      try {
+        const raw = localStorage.getItem('LocalTube_Catalog_Backup');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.videos) && parsed.videos.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+
+      return null;
+    }
 
     function openDB() {
       return new Promise((resolve, reject) => {
@@ -1220,43 +1250,6 @@
       renderAll();
     }
 
-    async function exportLocalIndexJson() {
-      const payloadStr = JSON.stringify(buildSerializableCachePayload(), null, 2);
-      if ('showSaveFilePicker' in window) {
-        try {
-          const handle = await window.showSaveFilePicker({
-            suggestedName: SHARED_CACHE_FILENAME,
-            types: [{ description: 'LocalTube Catalog File', accept: { 'application/json': ['.json'] } }]
-          });
-          const w = await handle.createWritable();
-          await w.write(payloadStr);
-          await w.close();
-          showToast('Saved catalog to your computer! Any browser on your Mac or PC can load it.');
-          return;
-        } catch (e) {
-          if (e && e.name === 'AbortError') return;
-        }
-      }
-      const blob = new Blob([payloadStr], { type: 'application/json' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = SHARED_CACHE_FILENAME; a.click();
-      showToast('Saved catalog file to your computer!');
-    }
-
-    function importLocalIndexJson(e) {
-      const file = e.target.files && e.target.files[0]; if (!file) return;
-      const r = new FileReader();
-      r.onload = async (ev) => {
-        try {
-          const data = JSON.parse(ev.target.result);
-          if (Array.isArray(data.videos)) { for (const v of data.videos) await dbPut('videos', v); state.videos = data.videos; }
-          if (Array.isArray(data.folders)) { for (const f of data.folders) await dbPut('folders', f); state.folders = data.folders; }
-          scheduleCrossBrowserSync();
-          showToast('Catalog loaded! Your videos, actors, and history are ready.'); renderAll();
-        } catch (err) { showToast('Could not read that catalog file.'); }
-      };
-      r.readAsText(file); e.target.value = '';
-    }
-
     function openEditModal(video) {
       state.editingVideoId = video.id;
       document.getElementById('editTitleInput').value = video.title || '';
@@ -1268,18 +1261,11 @@
     // Wire Event Listeners
     document.getElementById('dirInput').onchange = handleFilesSelected;
     document.getElementById('fileInput').onchange = handleFilesSelected;
-    document.getElementById('importJsonInput').onchange = importLocalIndexJson;
     document.getElementById('sidebarAddFolderBtn').onclick = handleLinkNativeFolder;
     document.getElementById('modalNativeHandleBtn').onclick = handleLinkNativeFolder;
     document.getElementById('modalPickFolderBtn').onclick = () => document.getElementById('dirInput').click();
     document.getElementById('modalPickFilesBtn').onclick = () => document.getElementById('fileInput').click();
-    document.getElementById('importIndexBtn').onclick = () => document.getElementById('importJsonInput').click();
     document.getElementById('privacyBadgeBtn').onclick = () => document.getElementById('folderModal').classList.remove('hidden');
-    document.getElementById('saveDiskCacheToFoldersBtn').onclick = async () => {
-      let ok = false;
-      for (const f of state.folders) { if (f.dirHandle && await writeDiskCacheToDirectoryHandle(f.dirHandle, f.id, true)) ok = true; }
-      if (ok) showToast('Catalog saved directly inside your video folder!'); else await exportLocalIndexJson();
-    };
     document.getElementById('clearCatalogBtn').onclick = () => {
       document.getElementById('clearCatalogBtn').classList.add('hidden');
       document.getElementById('clearConfirmBox').classList.remove('hidden');
@@ -1340,16 +1326,12 @@
     };
 
     (async function init() {
-      try {
-        const res = await fetch(LOCAL_BRIDGE_URL);
-        if (res.ok) {
-          const shared = await res.json();
-          if (shared && Array.isArray(shared.videos) && shared.videos.length > 0) {
-            for (const f of (shared.folders || [])) await dbPut('folders', f);
-            for (const v of shared.videos) await dbPut('videos', v);
-          }
-        }
-      } catch (e) {}
+      // Automatically discover and load the catalog from the default computer location first
+      const discovered = await autoDiscoverDefaultComputerCatalog();
+      if (discovered && Array.isArray(discovered.videos) && discovered.videos.length > 0) {
+        for (const f of (discovered.folders || [])) await dbPut('folders', f);
+        for (const v of discovered.videos) await dbPut('videos', v);
+      }
 
       const savedFolders = await dbGetAll('folders'), savedVideos = await dbGetAll('videos');
       if (savedVideos.length > 0) {
