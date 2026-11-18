@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LocalTube — Cloud-Hosted Local-First Video Hub</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Optional auto-generated JS catalog mirror so Edge/Chrome/Firefox can load the shared catalog even on file:// -->
+  <script src="./localtube_catalog.js" onerror="window.__LOCALTUBE_NO_JS_MIRROR__=true"></script>
   <style>
     body { background: #0f0f0f; color: #f1f1f1; font-family: system-ui, -apple-system, sans-serif; overflow-x: hidden; }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -295,22 +297,22 @@
         <button id="modalNativeHandleBtn" type="button" class="bg-[#ff0000] hover:bg-red-600 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition shadow-lg">
           📁 + Add Video Folder (Auto-Sync)
         </button>
-        <button id="modalPickFolderBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition">
-          📂 + Add Folder (Standard)
-        </button>
-        <button id="modalPickFilesBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition">
-          🎬 + Add Individual Videos
-        </button>
-      </div>
-
-      <div class="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-3.5 text-xs space-y-1.5">
+      <div class="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-3.5 text-xs space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="font-bold text-emerald-300">✓ Automatic Catalog Discovery Across All Browsers</span>
-          <span id="crossBrowserStatusPill" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">Auto-Loaded from Default Location</span>
+          <span id="crossBrowserStatusPill" class="text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-semibold">Checking Default Location...</span>
         </div>
         <p class="text-zinc-300 text-[11px]">
-          When you build your catalog in any browser for the first time, LocalTube automatically saves it to your computer&apos;s default LocalTube location. Opening LocalTube in Safari, Chrome, Edge, Brave, or Firefox automatically finds and loads your catalog—you never have to locate a file.
+          When you build your catalog in any browser (like Chrome), LocalTube saves it to your computer&apos;s default LocalTube folder (<code class="text-emerald-300">~/.localtube/</code>) and inside your linked video folders. Opening LocalTube in Edge, Safari, Brave, or Firefox automatically loads that catalog.
         </p>
+        <div class="flex flex-wrap items-center gap-2 pt-1">
+          <button id="downloadCompanionLauncherBtn" type="button" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg text-[11px] transition shadow">
+            ⚡ Enable Instant Chrome ↔ Edge Auto-Sync (1-Click Helper)
+          </button>
+          <span id="companionSyncHint" class="text-[10px] text-zinc-400">
+            Optional background helper so Edge, Chrome &amp; Safari share <code class="text-zinc-300">~/.localtube/</code> with zero folder prompts.
+          </span>
+        </div>
       </div>
 
       <div>
@@ -370,22 +372,35 @@
   <script>
     const DB_NAME = 'LocalTubeDB_v2';
     const SHARED_CACHE_FILENAME = 'localtube_index_cache.json';
-    const LOCAL_BRIDGE_URL = 'http://localhost:8765/api/shared-cache';
+    const LOCAL_BRIDGE_ENDPOINTS = [
+      'http://127.0.0.1:8765/api/shared-cache',
+      'http://localhost:8765/api/shared-cache',
+      '/api/shared-cache'
+    ];
     const DEFAULT_RELATIVE_CATALOG_URL = './localtube_index_cache.json';
     const VIDEO_EXTS = ['.mp4', '.mkv', '.webm', '.mov', '.avi', '.m4v'];
 
+    function hasRealUserVideos(list) {
+      return Array.isArray(list) && list.some(v => v && !String(v.id || '').startsWith('demo-vid-'));
+    }
+
     // Default startup action: automatically find and load the catalog from the computer's default location
     async function autoDiscoverDefaultComputerCatalog() {
-      // 1. Check the fixed default computer home location (~/.localtube/localtube_index_cache.json)
-      try {
-        const res = await fetch(LOCAL_BRIDGE_URL, { cache: 'no-store' });
-        if (res.ok) {
-          const shared = await res.json();
-          if (shared && Array.isArray(shared.videos) && shared.videos.length > 0) {
-            return shared;
+      // 1. Check 127.0.0.1 and localhost companion endpoints (ensures Edge & Chrome share the exact same ~/.localtube catalog)
+      for (const endpoint of LOCAL_BRIDGE_ENDPOINTS) {
+        try {
+          const res = await fetch(endpoint + '?t=' + Date.now(), { cache: 'no-store' });
+          if (res.ok) {
+            const shared = await res.json();
+            state.bridgeActive = true;
+            const pill = document.getElementById('crossBrowserStatusPill');
+            if (pill) pill.textContent = '✓ Connected to ~/.localtube Computer Catalog';
+            if (shared && Array.isArray(shared.videos) && shared.videos.length > 0) {
+              return shared;
+            }
           }
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
 
       // 2. Check the default app folder location (./localtube_index_cache.json next to index.html)
       try {
@@ -398,7 +413,137 @@
         }
       } catch (e) {}
 
-      // 3. Check local storage backup
+      // 3. Check localtube_catalog.js global script variable (works across Edge & Chrome even when opening index.html via file://)
+      if (window.__LOCALTUBE_SHARED_CATALOG__ && Array.isArray(window.__LOCALTUBE_SHARED_CATALOG__.videos) && window.__LOCALTUBE_SHARED_CATALOG__.videos.length > 0) {
+        return window.__LOCALTUBE_SHARED_CATALOG__;
+      }
+
+      // 4. Check local storage backup
+      try {
+        const raw = localStorage.getItem('LocalTube_Catalog_Backup');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.videos) && parsed.videos.length > 0) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+
+      return null;
+    }
+
+    // Embedded 1-Click Self-Contained Python Helper Generator (so everything lives inside this single index.html file)
+    function downloadEmbeddedCompanionHelper() {
+      const pyScript = [
+        '#!/usr/bin/env python3',
+        'import os, json, urllib.parse, mimetypes',
+        'from http.server import HTTPServer, SimpleHTTPRequestHandler',
+        'PORT = 8765',
+        'HOME_DIR = os.path.join(os.path.expanduser("~"), ".localtube")',
+        'os.makedirs(HOME_DIR, exist_ok=True)',
+        'SHARED_CACHE = os.path.join(HOME_DIR, "localtube_index_cache.json")',
+        'LOCAL_MIRROR = "localtube_index_cache.json"',
+        'LOCAL_JS = "localtube_catalog.js"',
+        'def load_cache():',
+        '    for p in (SHARED_CACHE, LOCAL_MIRROR):',
+        '        if os.path.exists(p):',
+        '            try:',
+        '                with open(p, "r", encoding="utf-8") as f:',
+        '                    d = json.load(f)',
+        '                    if d and d.get("videos"): return d',
+        '            except Exception: pass',
+        '    return {"schemaVersion": 2, "folders": [], "videos": []}',
+        'def is_demo_only(payload):',
+        '    vids = payload.get("videos") if isinstance(payload, dict) else []',
+        '    return (not vids) or all(str(v.get("id", "")).startswith("demo-vid-") for v in vids)',
+        'def save_cache(payload):',
+        '    cur = load_cache()',
+        '    if any(not str(v.get("id", "")).startswith("demo-vid-") for v in cur.get("videos", [])) and is_demo_only(payload):',
+        '        return cur',
+        '    for t in (SHARED_CACHE, LOCAL_MIRROR):',
+        '        try:',
+        '            with open(t, "w", encoding="utf-8") as f: json.dump(payload, f, indent=2)',
+        '        except Exception: pass',
+        '    try:',
+        '        with open(LOCAL_JS, "w", encoding="utf-8") as f:',
+        '            f.write("window.__LOCALTUBE_SHARED_CATALOG__ = " + json.dumps(payload) + ";\\n")',
+        '    except Exception: pass',
+        '    return payload',
+        'class Handler(SimpleHTTPRequestHandler):',
+        '    def end_headers(self):',
+        '        self.send_header("Access-Control-Allow-Origin", "*")',
+        '        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")',
+        '        self.send_header("Access-Control-Allow-Headers", "Content-Type, Access-Control-Allow-Private-Network")',
+        '        self.send_header("Access-Control-Allow-Private-Network", "true")',
+        '        self.send_header("Cache-Control", "no-store")',
+        '        super().end_headers()',
+        '    def do_OPTIONS(self): self.send_response(200); self.end_headers()',
+        '    def do_GET(self):',
+        '        if self.path.startswith("/api/shared-cache"):',
+        '            raw = json.dumps(load_cache()).encode("utf-8")',
+        '            self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(raw))); self.end_headers(); self.wfile.write(raw); return',
+        '        return super().do_GET()',
+        '    def do_POST(self):',
+        '        if self.path.startswith("/api/shared-cache"):',
+        '            ln = int(self.headers.get("Content-Length", 0))',
+        '            body = json.loads(self.rfile.read(ln).decode("utf-8")) if ln > 0 else {}',
+        '            saved = save_cache(body)',
+        '            raw = json.dumps({"ok": True, "catalog": saved}).encode("utf-8")',
+        '            self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(raw))); self.end_headers(); self.wfile.write(raw); return',
+        '        self.send_error(404)',
+        '    def do_DELETE(self):',
+        '        if self.path.startswith("/api/shared-cache"):',
+        '            for t in (SHARED_CACHE, LOCAL_MIRROR, LOCAL_JS):',
+        '                if os.path.exists(t):',
+        '                    try: os.remove(t)',
+        '                    except Exception: pass',
+        '            raw = b\'{"ok":true}\'',
+        '            self.send_response(200); self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(raw))); self.end_headers(); self.wfile.write(raw); return',
+        '        self.send_error(404)',
+        'if __name__ == "__main__":',
+        '    print("LocalTube Cross-Browser Sync running at http://127.0.0.1:8765 (Catalog: " + SHARED_CACHE + ")")',
+        '    HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()'
+      ].join('\n');
+
+      // Also write current catalog into localtube_catalog.js right next to index.html if user saves it in the same folder
+      const catalogJsBlob = new Blob(
+        ['window.__LOCALTUBE_SHARED_CATALOG__ = ' + JSON.stringify(buildSerializableCachePayload()) + ';\n'],
+        { type: 'application/javascript' }
+      );
+      const aJs = document.createElement('a');
+      aJs.href = URL.createObjectURL(catalogJsBlob);
+      aJs.download = 'localtube_catalog.js';
+      aJs.click();
+
+      const pyBlob = new Blob([pyScript], { type: 'text/x-python' });
+      const aPy = document.createElement('a');
+      aPy.href = URL.createObjectURL(pyBlob);
+      aPy.download = 'server.py';
+      aPy.click();
+
+      showToast('Downloaded localtube_catalog.js & server.py into your folder for instant Chrome ↔ Edge sync!');
+    }
+          }
+        } catch (e) {}
+      }
+
+      // 2. Check the default app folder location (./localtube_index_cache.json next to index.html)
+      try {
+        const relRes = await fetch(DEFAULT_RELATIVE_CATALOG_URL + '?t=' + Date.now(), { cache: 'no-store' });
+        if (relRes.ok) {
+          const relData = await relRes.json();
+          if (relData && Array.isArray(relData.videos) && relData.videos.length > 0) {
+            return relData;
+          }
+        }
+      } catch (e) {}
+
+      // 3. Check localtube_catalog.js global script variable (works across Edge & Chrome even when opening index.html via file://)
+      if (window.__LOCALTUBE_SHARED_CATALOG__ && Array.isArray(window.__LOCALTUBE_SHARED_CATALOG__.videos) && window.__LOCALTUBE_SHARED_CATALOG__.videos.length > 0) {
+        return window.__LOCALTUBE_SHARED_CATALOG__;
+      }
+
+      // 4. Check local storage backup
       try {
         const raw = localStorage.getItem('LocalTube_Catalog_Backup');
         if (raw) {
@@ -587,17 +732,23 @@
 
     let syncTimer = null;
     function scheduleCrossBrowserSync() {
+      if (!state.isHydrated) return;
+      if (!hasRealUserVideos(state.videos)) return;
       clearTimeout(syncTimer);
       syncTimer = setTimeout(async () => {
         const payload = buildSerializableCachePayload();
         try {
           localStorage.setItem('LocalTube_Catalog_Backup', JSON.stringify(payload));
+          localStorage.setItem('LocalTube_LastSyncAt', String(payload.updatedAt));
         } catch (e) {}
         for (const f of state.folders) { if (f.dirHandle) await writeDiskCacheToDirectoryHandle(f.dirHandle, f.id, false); }
-        try {
-          await fetch(LOCAL_BRIDGE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        } catch (e) {}
-      }, 450);
+        for (const endpoint of LOCAL_BRIDGE_ENDPOINTS) {
+          try {
+            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (res.ok) break;
+          } catch (e) {}
+        }
+      }, 350);
     }
 
     async function clearAllSavedCatalog() {
@@ -611,15 +762,20 @@
           tx.onerror = () => res();
         });
       } catch (e) {}
-      try { localStorage.removeItem('LocalTube_Catalog_Backup'); } catch (e) {}
+      try {
+        localStorage.removeItem('LocalTube_Catalog_Backup');
+        localStorage.removeItem('LocalTube_LastSyncAt');
+      } catch (e) {}
       for (const f of state.folders) {
         if (f.dirHandle) {
           try { await f.dirHandle.removeEntry(SHARED_CACHE_FILENAME); } catch (e) {}
         }
       }
-      try {
-        await fetch(LOCAL_BRIDGE_URL, { method: 'DELETE' });
-      } catch (e) {}
+      for (const endpoint of LOCAL_BRIDGE_ENDPOINTS) {
+        try {
+          await fetch(endpoint, { method: 'DELETE' });
+        } catch (e) {}
+      }
 
       mainVideo.pause();
       mainVideo.removeAttribute('src');
@@ -1265,6 +1421,7 @@
     document.getElementById('modalNativeHandleBtn').onclick = handleLinkNativeFolder;
     document.getElementById('modalPickFolderBtn').onclick = () => document.getElementById('dirInput').click();
     document.getElementById('modalPickFilesBtn').onclick = () => document.getElementById('fileInput').click();
+    document.getElementById('downloadCompanionLauncherBtn').onclick = downloadEmbeddedCompanionHelper;
     document.getElementById('privacyBadgeBtn').onclick = () => document.getElementById('folderModal').classList.remove('hidden');
     document.getElementById('clearCatalogBtn').onclick = () => {
       document.getElementById('clearCatalogBtn').classList.add('hidden');
@@ -1326,22 +1483,42 @@
     };
 
     (async function init() {
-      // Automatically discover and load the catalog from the default computer location first
+      // 1. Discover the computer-wide catalog first (so Edge loads Chrome's saved catalog immediately)
       const discovered = await autoDiscoverDefaultComputerCatalog();
-      if (discovered && Array.isArray(discovered.videos) && discovered.videos.length > 0) {
-        for (const f of (discovered.folders || [])) await dbPut('folders', f);
-        for (const v of discovered.videos) await dbPut('videos', v);
+      const savedFolders = await dbGetAll('folders');
+      const savedVideos = await dbGetAll('videos');
+
+      const sharedHasReal = discovered && hasRealUserVideos(discovered.videos);
+      const localHasReal = hasRealUserVideos(savedVideos);
+
+      let chosenFolders = savedFolders;
+      let chosenVideos = savedVideos;
+
+      if (
+        discovered &&
+        Array.isArray(discovered.videos) &&
+        discovered.videos.length > 0 &&
+        ((sharedHasReal && !localHasReal) || !savedVideos.length || (discovered.updatedAt || 0) > (Number(localStorage.getItem('LocalTube_LastSyncAt')) || 0))
+      ) {
+        const localMap = new Map(savedVideos.map(v => [v.id, v]));
+        chosenFolders = (discovered.folders && discovered.folders.length) ? discovered.folders : INITIAL_FOLDERS;
+        chosenVideos = discovered.videos.map(v => {
+          const prev = localMap.get(v.id);
+          return prev ? { ...prev, ...v, cachedFileBlob: prev.cachedFileBlob, fileHandle: prev.fileHandle } : v;
+        });
+        for (const f of chosenFolders) await dbPut('folders', f);
+        for (const v of chosenVideos) await dbPut('videos', v);
       }
 
-      const savedFolders = await dbGetAll('folders'), savedVideos = await dbGetAll('videos');
-      if (savedVideos.length > 0) {
-        state.folders = savedFolders.length ? savedFolders : INITIAL_FOLDERS;
-        state.videos = savedVideos.map(v => { if (v.cachedFileBlob instanceof Blob) v.videoUrl = URL.createObjectURL(v.cachedFileBlob); return v; });
+      if (chosenVideos.length > 0) {
+        state.folders = chosenFolders.length ? chosenFolders : INITIAL_FOLDERS;
+        state.videos = chosenVideos.map(v => { if (v.cachedFileBlob instanceof Blob) v.videoUrl = URL.createObjectURL(v.cachedFileBlob); return v; });
       } else {
         state.folders = INITIAL_FOLDERS; state.videos = createInitialDemoVideos();
         for (const f of state.folders) await dbPut('folders', f);
         for (const v of state.videos) await dbPut('videos', v);
       }
+      state.isHydrated = true;
       scheduleCrossBrowserSync();
       syncVolumeUI();
       renderAll();
