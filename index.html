@@ -297,6 +297,14 @@
         <button id="modalNativeHandleBtn" type="button" class="bg-[#ff0000] hover:bg-red-600 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition shadow-lg">
           📁 + Add Video Folder (Auto-Sync)
         </button>
+        <button id="modalPickFolderBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition">
+          📂 + Select Folder (All Browsers)
+        </button>
+        <button id="modalPickFilesBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition">
+          🎬 + Select Video Files
+        </button>
+      </div>
+
       <div class="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-3.5 text-xs space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <span class="font-bold text-emerald-300">✓ Automatic Catalog Discovery Across All Browsers</span>
@@ -522,39 +530,6 @@
       aPy.click();
 
       showToast('Downloaded localtube_catalog.js & server.py into your folder for instant Chrome ↔ Edge sync!');
-    }
-          }
-        } catch (e) {}
-      }
-
-      // 2. Check the default app folder location (./localtube_index_cache.json next to index.html)
-      try {
-        const relRes = await fetch(DEFAULT_RELATIVE_CATALOG_URL + '?t=' + Date.now(), { cache: 'no-store' });
-        if (relRes.ok) {
-          const relData = await relRes.json();
-          if (relData && Array.isArray(relData.videos) && relData.videos.length > 0) {
-            return relData;
-          }
-        }
-      } catch (e) {}
-
-      // 3. Check localtube_catalog.js global script variable (works across Edge & Chrome even when opening index.html via file://)
-      if (window.__LOCALTUBE_SHARED_CATALOG__ && Array.isArray(window.__LOCALTUBE_SHARED_CATALOG__.videos) && window.__LOCALTUBE_SHARED_CATALOG__.videos.length > 0) {
-        return window.__LOCALTUBE_SHARED_CATALOG__;
-      }
-
-      // 4. Check local storage backup
-      try {
-        const raw = localStorage.getItem('LocalTube_Catalog_Backup');
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && Array.isArray(parsed.videos) && parsed.videos.length > 0) {
-            return parsed;
-          }
-        }
-      } catch (e) {}
-
-      return null;
     }
 
     function openDB() {
