@@ -1,0 +1,2105 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LocalTube — Cloud-Hosted Local-First Video Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #0f0f0f;
+      color: #f1f1f1;
+      font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0f0f0f; }
+    ::-webkit-scrollbar-thumb { background: #3f3f3f; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col select-none bg-[#0f0f0f] text-[#f1f1f1]">
+
+  <!-- Hidden Offscreen Video for Live Timeline Frame Thumbnail Extraction -->
+  <video id="previewVideo" muted playsinline preload="metadata" crossorigin="anonymous" class="hidden"></video>
+
+  <!-- Hidden Universal Folder, File & JSON Import Inputs -->
+  <input id="dirInput" type="file" webkitdirectory directory multiple class="hidden" />
+  <input id="fileInput" type="file" accept="video/*,.mkv,.mp4,.webm,.mov,.avi" multiple class="hidden" />
+  <input id="importJsonInput" type="file" accept=".json,application/json" class="hidden" />
+
+  <!-- Top YouTube Navbar -->
+  <header class="sticky top-0 z-40 h-14 bg-[#0f0f0f]/95 backdrop-blur border-b border-white/10 px-4 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <button id="toggleSidebarBtn" class="p-2 rounded-full hover:bg-[#272727] transition" title="Toggle Sidebar">
+        ☰
+      </button>
+      <div id="brandHomeBtn" class="flex items-center gap-2 cursor-pointer">
+        <div class="w-8 h-6 bg-[#ff0000] rounded-lg flex items-center justify-center shadow">
+          <span class="text-white font-bold text-xs">▶</span>
+        </div>
+        <span class="font-bold text-lg tracking-tight">LocalTube</span>
+      </div>
+      <button
+        id="privacyBadgeBtn"
+        class="hidden sm:inline-flex items-center gap-1.5 text-[11px] bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-full font-semibold transition"
+        title="Click to view Zero-Upload Local Privacy Architecture"
+      >
+        <span>🔒 100% Local Privacy • 0 Bytes Uploaded</span>
+      </button>
+    </div>
+
+    <div class="flex-1 max-w-xl">
+      <div class="flex w-full bg-[#121212] border border-[#303030] focus-within:border-blue-500 rounded-full overflow-hidden">
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="Search local titles, actors, folders, or genres..."
+          class="w-full bg-transparent px-4 py-1.5 text-sm text-white focus:outline-none"
+        />
+        <button id="clearSearchBtn" class="hidden px-3 text-zinc-400 hover:text-white">✕</button>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <span id="scanStatusBadge" class="hidden text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full animate-pulse"></span>
+      <button
+        id="reconnectBannerBtn"
+        class="hidden bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold px-3 py-1.5 rounded-full transition shadow"
+        title="1-Click Re-authorize Local PC Folders for this browser session"
+      >
+        ⚡ Reconnect Local Drives
+      </button>
+      <button
+        id="openFolderModalBtn"
+        class="bg-[#272727] hover:bg-[#383838] text-xs sm:text-sm font-medium px-3.5 py-1.5 rounded-full transition"
+      >
+        + Local Repository (<span id="folderCountBadge">0</span>)
+      </button>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+    <!-- Left Sidebar -->
+    <aside id="sidebar" class="w-64 bg-[#0f0f0f] border-r border-white/10 p-3 space-y-5 shrink-0 overflow-y-auto flex flex-col justify-between">
+      <div class="space-y-5">
+        <div id="navSectionList" class="space-y-1"></div>
+
+        <!-- Connected PC Folders -->
+        <div class="border-t border-white/10 pt-4">
+          <div class="flex items-center justify-between px-3 mb-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-400">Local PC Repositories</span>
+            <button id="sidebarAddFolderBtn" class="text-[11px] text-red-400 hover:underline">+ Link Folder</button>
+          </div>
+          <div id="sidebarFoldersList" class="space-y-1"></div>
+        </div>
+
+        <!-- Actors / Cast Directory -->
+        <div class="border-t border-white/10 pt-4">
+          <div class="flex items-center justify-between px-3 mb-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+              Actors (<span id="actorCountBadge">0</span>)
+            </span>
+            <button id="resetActorBtn" class="hidden text-[11px] text-blue-400 hover:underline">Reset</button>
+          </div>
+          <div id="sidebarActorsList" class="space-y-1 max-h-60 overflow-y-auto"></div>
+        </div>
+      </div>
+
+      <!-- Sidebar Credit & Privacy Guarantee Footnote -->
+      <div class="border-t border-white/10 pt-4 px-3 pb-1 text-[11px] text-zinc-400 space-y-2">
+        <div class="bg-[#161616] border border-white/5 rounded-lg p-2 text-[10px] text-zinc-400 leading-relaxed">
+          <span class="text-emerald-400 font-semibold">🔒 Local-First Guarantee:</span> Hosted online, executed 100% in your browser. Videos &amp; index cache never leave your PC.
+        </div>
+        <div>Created by <span class="text-white font-semibold">Victor Chowdhury</span></div>
+        <a
+          href="https://www.victorbuildsai.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1 text-red-400 hover:text-red-300 hover:underline font-medium"
+        >
+          <span>victorbuildsai.com</span>
+          <span>↗</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto p-4 lg:p-6 space-y-6 flex flex-col justify-between">
+      <div class="space-y-6">
+
+        <!-- Persistent Unified Player Wrapper (Switches between Watch View & Bottom-Right Miniplayer without losing progress) -->
+        <div id="playerSection" class="hidden">
+          <div id="playerInnerCol" class="space-y-4">
+            <!-- Watch Mode Top Action Bar -->
+            <div id="watchTopBar" class="flex flex-wrap items-center justify-between gap-2">
+              <button
+                id="backToBrowseBtn"
+                class="flex items-center gap-2 text-xs sm:text-sm bg-[#272727] hover:bg-[#383838] px-4 py-1.5 rounded-full font-medium transition"
+              >
+                ← Back to Browse (Keep Playing in Miniplayer)
+              </button>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="hidden xl:inline-block text-[11px] text-zinc-400 bg-black/40 px-3 py-1 rounded-full border border-white/5">
+                  Shortcuts: ⬅/➡ ±5s • ⬆/⬇ Vol • Shift+P / Shift+N Prev/Next
+                </span>
+                <label class="inline-flex items-center gap-1.5 text-xs bg-[#222] px-3 py-1.5 rounded-full cursor-pointer">
+                  <input id="autoplayNextToggle" type="checkbox" checked class="accent-red-600 w-3.5 h-3.5" />
+                  <span>Autoplay Next</span>
+                </label>
+                <button id="theaterBtn" class="text-xs bg-[#222] hover:bg-[#333] px-3 py-1.5 rounded-full">
+                  Theater Mode
+                </button>
+                <button id="dockMiniBtn" class="text-xs bg-[#222] hover:bg-[#333] px-3 py-1.5 rounded-full">
+                  Miniplayer [i]
+                </button>
+              </div>
+            </div>
+
+            <!-- Video Element + Custom Interactive Timeline Scrubber -->
+            <div id="playerBox" class="relative aspect-video bg-black rounded-xl overflow-hidden group select-none">
+              <video
+                id="mainVideo"
+                autoplay
+                playsinline
+                crossorigin="anonymous"
+                class="w-full h-full object-contain bg-black cursor-pointer"
+              ></video>
+
+              <!-- 1-Click Permission Re-Grant Overlay (When a Native Handle Needs Session Unlock) -->
+              <div
+                id="handlePermissionOverlay"
+                class="hidden absolute inset-0 z-30 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center space-y-3"
+              >
+                <div class="text-amber-400 text-sm font-bold">🔒 Local PC Folder Permission Required for This Session</div>
+                <p class="text-xs text-zinc-300 max-w-md">
+                  Your video index is cached locally, but your browser requires a 1-click confirmation to stream directly from your local disk without uploading.
+                </p>
+                <button
+                  id="grantHandleOverlayBtn"
+                  class="bg-[#ff0000] hover:bg-red-600 text-white font-bold text-xs px-5 py-2.5 rounded-full shadow-lg transition"
+                >
+                  ⚡ Unlock Local Folder &amp; Play Immediately
+                </button>
+              </div>
+
+              <!-- On-Screen Keyboard Seek / Volume / Prev-Next HUD -->
+              <div
+                id="playerHudBadge"
+                class="hidden absolute top-5 left-1/2 -translate-x-1/2 z-30 bg-black/85 backdrop-blur-md border border-white/15 text-white px-4 py-2 rounded-full text-xs sm:text-sm font-bold shadow-2xl pointer-events-none"
+              ></div>
+
+              <!-- Miniplayer Top Overlay Controls -->
+              <div id="miniOverlayControls" class="hidden absolute top-2 right-2 z-30 flex items-center gap-1.5 bg-black/80 backdrop-blur px-2.5 py-1 rounded-full">
+                <button id="miniPrevBtn" class="text-xs text-white hover:text-amber-400 font-bold px-1" title="Previous Video (Shift+P)">
+                  ⏮
+                </button>
+                <button id="miniNextBtn" class="text-xs text-white hover:text-amber-400 font-bold px-1" title="Next Video (Shift+N)">
+                  ⏭
+                </button>
+                <button id="expandFromMiniBtn" class="text-xs text-white hover:text-blue-400 font-semibold px-1" title="Expand (Keeps Progress)">
+                  ⤢ Expand
+                </button>
+                <button id="closeMiniBtn" class="text-xs text-zinc-300 hover:text-red-400 font-bold px-1" title="Close Player">
+                  ✕
+                </button>
+              </div>
+
+              <!-- Custom YouTube Timeline Bar & Controls -->
+              <div class="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/95 via-black/70 to-transparent pt-10 pb-2.5 px-3 sm:px-4 flex flex-col gap-2">
+                <!-- Timeline Tracking Slider -->
+                <div
+                  id="timelineBar"
+                  class="relative h-2 hover:h-3 bg-white/25 rounded-full cursor-pointer transition-all flex items-center"
+                >
+                  <!-- Floating Live Frame Thumbnail Preview Popup -->
+                  <div
+                    id="timelinePreviewPopup"
+                    class="hidden absolute bottom-6 -translate-x-1/2 z-40 pointer-events-none flex flex-col items-center"
+                  >
+                    <div class="w-36 sm:w-44 aspect-video bg-[#111] rounded-lg overflow-hidden border-2 border-white shadow-2xl">
+                      <img id="timelinePreviewImg" src="" alt="Preview" class="w-full h-full object-cover" />
+                    </div>
+                    <span id="timelinePreviewTime" class="mt-1 bg-black/90 text-white text-[11px] font-mono font-bold px-2 py-0.5 rounded border border-white/15 shadow">
+                      0:00
+                    </span>
+                  </div>
+
+                  <!-- Hover Ghost Bar -->
+                  <div id="timelineGhostBar" class="hidden absolute top-0 bottom-0 left-0 bg-white/35 rounded-full pointer-events-none"></div>
+
+                  <!-- Red Played Progress Bar -->
+                  <div id="timelineProgressBar" class="absolute top-0 bottom-0 left-0 bg-[#ff0000] rounded-full pointer-events-none" style="width: 0%"></div>
+
+                  <!-- Scrubber Knob -->
+                  <div id="timelineKnob" class="absolute -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-[#ff0000] shadow-lg ring-2 ring-white pointer-events-none" style="left: 0%"></div>
+                </div>
+
+                <!-- Controls Row -->
+                <div class="flex items-center justify-between gap-2 text-xs text-white">
+                  <div class="flex items-center gap-1.5 sm:gap-2.5 flex-wrap">
+                    <!-- Previous Video Button -->
+                    <button
+                      id="prevVideoBtn"
+                      type="button"
+                      class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center font-bold transition"
+                      title="Previous Video (Shift+P)"
+                    >
+                      ⏮
+                    </button>
+
+                    <!-- Play / Pause -->
+                    <button
+                      id="playPauseBtn"
+                      type="button"
+                      class="w-8 h-8 rounded-full bg-[#ff0000] hover:bg-red-600 flex items-center justify-center font-bold transition shadow"
+                      title="Play / Pause (Space)"
+                    >
+                      ▶
+                    </button>
+
+                    <!-- Next Video Button -->
+                    <button
+                      id="nextVideoBtn"
+                      type="button"
+                      class="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center font-bold transition"
+                      title="Next Video (Shift+N)"
+                    >
+                      ⏭
+                    </button>
+
+                    <button id="seekBackBtn" type="button" class="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[11px] font-semibold" title="Rewind 5s (Left Arrow)">
+                      ⏪ -5s
+                    </button>
+                    <button id="seekFwdBtn" type="button" class="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[11px] font-semibold" title="Forward 5s (Right Arrow)">
+                      +5s ⏩
+                    </button>
+
+                    <!-- Volume Toggle & Slider (Strictly Bound to Up/Down Arrow Keys) -->
+                    <div class="flex items-center gap-1.5 bg-white/10 px-2.5 py-1 rounded-full">
+                      <button id="muteBtn" type="button" class="text-xs hover:text-red-400" title="Mute (M)">🔊</button>
+                      <input
+                        id="volumeSlider"
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value="0.85"
+                        class="w-14 sm:w-20 accent-red-600 cursor-pointer h-1"
+                        title="Volume (Up / Down Arrow Keys)"
+                      />
+                      <span id="volumeLabel" class="text-[10px] font-mono text-zinc-300 w-7 text-right">85%</span>
+                    </div>
+
+                    <span id="timeDisplay" class="font-mono text-[11px] text-zinc-200">0:00 / 0:00</span>
+                  </div>
+
+                  <div class="flex items-center gap-2">
+                    <select id="speedSelect" class="bg-black/70 border border-white/15 rounded px-1.5 py-0.5 text-[11px] text-white" title="Playback Speed">
+                      <option value="0.5">0.5x</option>
+                      <option value="1" selected>1x</option>
+                      <option value="1.25">1.25x</option>
+                      <option value="1.5">1.5x</option>
+                      <option value="2">2x</option>
+                    </select>
+                    <button id="fullscreenBtn" type="button" class="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs font-bold" title="Fullscreen">
+                      ⛶
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Miniplayer Footer -->
+            <div id="miniFooter" class="hidden p-3 cursor-pointer hover:bg-[#222] transition flex items-center justify-between gap-2">
+              <div class="min-w-0">
+                <div id="miniTitle" class="text-xs font-bold text-white truncate"></div>
+                <div id="miniMeta" class="text-[11px] text-zinc-400 truncate"></div>
+              </div>
+              <span class="text-[10px] bg-red-600/20 text-red-400 border border-red-500/30 px-2 py-0.5 rounded font-semibold shrink-0">
+                Expand
+              </span>
+            </div>
+
+            <!-- Full Watch Page Metadata, Prev/Next Bar & Like/Dislike Bar -->
+            <div id="watchDetails" class="space-y-3">
+              <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h1 id="watchTitle" class="text-xl font-bold text-white"></h1>
+                  <div id="watchSubMeta" class="flex flex-wrap items-center gap-2 text-xs text-zinc-400 mt-1"></div>
+                </div>
+
+                <!-- Prev/Next + Segmented Like | Dislike Pill -->
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="inline-flex items-center bg-[#272727] rounded-full overflow-hidden border border-white/10">
+                    <button id="watchPrevBarBtn" class="px-3 py-1.5 text-xs font-semibold hover:bg-[#383838] transition" title="Previous Video (Shift+P)">
+                      ⏮ Prev
+                    </button>
+                    <div class="w-px h-5 bg-white/15"></div>
+                    <button id="watchNextBarBtn" class="px-3 py-1.5 text-xs font-semibold hover:bg-[#383838] transition" title="Next Video (Shift+N)">
+                      Next ⏭
+                    </button>
+                  </div>
+
+                  <div class="inline-flex items-center bg-[#272727] rounded-full overflow-hidden border border-white/10">
+                    <button id="watchLikeBtn" class="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold transition">
+                      <span>👍</span>
+                      <span>Like</span>
+                      <span id="watchLikeCount" class="ml-0.5">0</span>
+                    </button>
+                    <div class="w-px h-5 bg-white/15"></div>
+                    <button id="watchDislikeBtn" class="flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold transition" title="Dislike">
+                      <span>👎</span>
+                    </button>
+                  </div>
+
+                  <button id="watchEditBtn" class="text-xs bg-[#272727] hover:bg-[#383838] px-3.5 py-1.5 rounded-full">
+                    ✎ Edit Info
+                  </button>
+                </div>
+              </div>
+
+              <div id="watchActorsBar" class="bg-[#1c1c1c] border border-white/10 rounded-xl p-3 flex flex-wrap items-center gap-2"></div>
+            </div>
+          </div>
+
+          <!-- Up Next Queue Sidebar in Watch View -->
+          <div id="upNextCol" class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400">Up Next Queue</h3>
+              <span id="queuePositionLabel" class="text-[11px] text-zinc-400"></span>
+            </div>
+            <div id="upNextList" class="space-y-2.5 max-h-[68vh] overflow-y-auto pr-1"></div>
+          </div>
+        </div>
+
+        <!-- Personalized Recommendations Shelf -->
+        <section id="recommendedShelf" class="bg-gradient-to-r from-[#1a1215] via-[#16161d] to-[#121820] border border-white/10 rounded-2xl p-4 lg:p-5 space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-red-400">
+                  ★ Personalized Portal Recommendations
+                </span>
+                <span id="recStatsBadge" class="text-[11px] bg-white/10 px-2 py-0.5 rounded-full text-zinc-300"></span>
+              </div>
+              <p id="recSubtitle" class="text-xs text-zinc-400 mt-0.5"></p>
+            </div>
+          </div>
+          <div id="recommendedGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+        </section>
+
+        <!-- Category Filter Pills & Sort -->
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div id="categoryPillsContainer" class="flex items-center gap-2 overflow-x-auto no-scrollbar"></div>
+
+          <div class="flex items-center gap-2">
+            <span id="activeActorChip" class="hidden bg-red-600/20 border border-red-500/40 text-red-300 text-xs px-3 py-1 rounded-full items-center gap-1.5"></span>
+            <select id="sortSelect" class="bg-[#1f1f1f] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none">
+              <option value="recommended">Sort: Recommended For You</option>
+              <option value="mostWatched">Sort: Most Watched Time</option>
+              <option value="title">Sort: Title (A-Z)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Main Video Browse Grid -->
+        <div id="videoGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6"></div>
+      </div>
+
+      <!-- Main Footer Credit -->
+      <footer class="mt-12 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-zinc-400">
+        <div>LocalTube — Cloud-Hosted Local-First Video Hub (Zero-Upload Privacy)</div>
+        <div class="flex items-center gap-2">
+          <span>Created by <strong class="text-white">Victor Chowdhury</strong></span>
+          <span>•</span>
+          <a
+            href="https://www.victorbuildsai.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-red-400 hover:text-red-300 hover:underline font-semibold"
+          >
+            https://www.victorbuildsai.com/
+          </a>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Modal 1: Cloud-Hosted Local Repository & Privacy Manager -->
+  <div id="folderModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#181818] border border-white/15 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <div>
+          <h2 class="text-base font-bold">Local Video Repository &amp; Zero-Upload Index Cache</h2>
+          <p class="text-[11px] text-zinc-400">
+            Even when this HTML file is hosted on GitHub Pages, Vercel, or Netlify, your videos stay 100% on your PC.
+          </p>
+        </div>
+        <button id="closeFolderModalBtn" class="text-zinc-400 hover:text-white text-lg">✕</button>
+      </div>
+
+      <!-- Privacy Guarantee Box -->
+      <div class="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-3.5 text-xs space-y-1">
+        <div class="font-bold text-emerald-300 flex items-center gap-1.5">
+          <span>🔒 How Cloud-to-Local Privacy Works</span>
+        </div>
+        <p class="text-zinc-300 text-[11px] leading-relaxed">
+          When you point LocalTube to a folder on your computer, your browser reads the files directly from your local disk (<code class="text-emerald-300">FileSystemDirectoryHandle</code> / <code class="text-emerald-300">Blob URL</code>) and stores thumbnails, actor tags, and watch history in your local browser <code class="text-emerald-300">IndexedDB</code>. <strong>No video or metadata is ever transmitted to any server.</strong>
+        </p>
+      </div>
+
+      <label class="flex items-center justify-between bg-[#121212] border border-white/10 rounded-xl p-3 cursor-pointer">
+        <div class="pr-3">
+          <div class="text-xs font-bold text-white">Cache Video Blobs in Local IndexedDB (Instant Zero-Prompt Playback)</div>
+          <div class="text-[11px] text-zinc-400">
+            When enabled, fallback folder uploads cache the playable file blob inside your local browser DB so videos play immediately on future visits without re-selecting.
+          </div>
+        </div>
+        <input id="cacheToggleCheckbox" type="checkbox" checked class="w-4 h-4 accent-red-600" />
+      </label>
+
+      <!-- Primary Folder Connection Buttons -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        <button
+          id="modalNativeHandleBtn"
+          type="button"
+          class="bg-[#ff0000] hover:bg-red-600 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-lg"
+          title="Best for Chrome/Edge/Brave: Links your local PC folder handle without duplicating video files"
+        >
+          <span>⚡ Link Local PC Folder (Native)</span>
+        </button>
+        <button
+          id="modalPickFolderBtn"
+          type="button"
+          class="bg-[#272727] hover:bg-[#383838] text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+        >
+          <span>📁 + Cache Folder (All Browsers)</span>
+        </button>
+        <button
+          id="modalPickFilesBtn"
+          type="button"
+          class="bg-[#272727] hover:bg-[#383838] text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5"
+        >
+          <span>🎬 + Add Video Files</span>
+        </button>
+      </div>
+
+      <!-- Connected Repositories List -->
+      <div>
+        <div class="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Linked Local Folders</div>
+        <div id="modalFolderList" class="space-y-2 max-h-48 overflow-y-auto"></div>
+      </div>
+
+      <!-- Backup / Restore Local Index Cache -->
+      <div class="border-t border-white/10 pt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span class="text-zinc-400 text-[11px]">Backup or transfer your cached thumbnails, likes &amp; watch history:</span>
+        <div class="flex items-center gap-2">
+          <button id="exportIndexBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-zinc-200 px-3 py-1.5 rounded-lg text-[11px] font-medium">
+            ⬇ Export Local Index (.json)
+          </button>
+          <button id="importIndexBtn" type="button" class="bg-[#272727] hover:bg-[#383838] text-zinc-200 px-3 py-1.5 rounded-lg text-[11px] font-medium">
+            ⬆ Import Index (.json)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Edit Video Metadata -->
+  <div id="editModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <form id="editForm" class="bg-[#181818] border border-white/15 rounded-2xl max-w-md w-full p-6 space-y-4">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <h3 class="text-base font-bold">Edit Video Metadata</h3>
+        <button id="closeEditModalBtn" type="button" class="text-zinc-400 hover:text-white">✕</button>
+      </div>
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="block text-zinc-400 mb-1">Title</label>
+          <input id="editTitleInput" type="text" required class="w-full bg-[#121212] border border-white/15 rounded-lg px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="block text-zinc-400 mb-1">Actors (comma-separated)</label>
+          <input id="editActorsInput" type="text" class="w-full bg-[#121212] border border-white/15 rounded-lg px-3 py-2 text-sm text-white" />
+        </div>
+        <div>
+          <label class="block text-zinc-400 mb-1">Category / Genre</label>
+          <input id="editCategoryInput" type="text" class="w-full bg-[#121212] border border-white/15 rounded-lg px-3 py-2 text-sm text-white" />
+        </div>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="cancelEditBtn" type="button" class="px-4 py-2 rounded-lg bg-[#272727] text-xs">Cancel</button>
+        <button type="submit" class="px-4 py-2 rounded-lg bg-[#ff0000] text-white text-xs font-bold">Save Changes</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="hidden fixed bottom-5 left-5 z-50 bg-[#272727] border border-white/15 text-white px-4 py-2.5 rounded-xl text-xs font-semibold shadow-2xl"></div>
+
+  <script>
+    // =========================================================================
+    // 1. INDEXED-DB STORAGE ("LocalTubeDB_v2") — STORES HANDLES, BLOBS & METADATA
+    // =========================================================================
+    const DB_NAME = 'LocalTubeDB_v2';
+    const DB_VERSION = 1;
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('videos')) db.createObjectStore('videos', { keyPath: 'id' });
+          if (!db.objectStoreNames.contains('folders')) db.createObjectStore('folders', { keyPath: 'id' });
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbGetAll(store) {
+      try {
+        const db = await openDB();
+        return new Promise((resolve) => {
+          const req = db.transaction(store, 'readonly').objectStore(store).getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        });
+      } catch (e) { return []; }
+    }
+
+    async function dbPut(store, item) {
+      try {
+        const db = await openDB();
+        const copy = { ...item };
+        delete copy.blobUrl; // transient object URLs are recreated per session
+        return new Promise((resolve) => {
+          const tx = db.transaction(store, 'readwrite');
+          tx.objectStore(store).put(copy);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        });
+      } catch (e) {}
+    }
+
+    async function dbDelete(store, id) {
+      try {
+        const db = await openDB();
+        return new Promise((resolve) => {
+          const tx = db.transaction(store, 'readwrite');
+          tx.objectStore(store).delete(id);
+          tx.oncomplete = () => resolve();
+        });
+      } catch (e) {}
+    }
+
+    // =========================================================================
+    // 2. UTILITIES & THUMBNAIL GENERATION
+    // =========================================================================
+    const VIDEO_EXTS = ['.mp4', '.mkv', '.webm', '.mov', '.avi', '.m4v'];
+    function isVideoFilename(name) {
+      const lower = (name || '').toLowerCase();
+      return VIDEO_EXTS.some(ext => lower.endsWith(ext));
+    }
+
+    function formatDuration(seconds) {
+      if (!seconds || isNaN(seconds)) return '0:00';
+      const total = Math.max(0, Math.floor(seconds));
+      const hrs = Math.floor(total / 3600);
+      const mins = Math.floor((total % 3600) / 60);
+      const secs = total % 60;
+      if (hrs > 0) return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      return `${mins}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function generateProceduralThumbnail(title, category, actors, res, accent = '#1e3a8a', seekSec = null) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640;
+      canvas.height = 360;
+      const ctx = canvas.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 640, 360);
+      grad.addColorStop(0, '#090b10');
+      grad.addColorStop(0.5, accent);
+      grad.addColorStop(1, '#0b0c10');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 640, 360);
+
+      ctx.fillStyle = 'rgba(255, 0, 0, 0.85)';
+      ctx.fillRect(28, 28, Math.max(90, (category || 'VIDEO').length * 11 + 24), 32);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText((category || 'VIDEO').toUpperCase(), 40, 49);
+
+      if (res) {
+        ctx.fillStyle = 'rgba(0,0,0,0.75)';
+        ctx.fillRect(540, 28, 72, 30);
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 14px sans-serif';
+        ctx.fillText(res, 558, 48);
+      }
+
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 26px sans-serif';
+      ctx.fillText((title || 'Untitled').slice(0, 36), 28, 235);
+
+      if (seekSec !== null) {
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText('Frame @ ' + formatDuration(seekSec), 28, 125);
+      } else if (actors && actors.length) {
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '16px sans-serif';
+        ctx.fillText('Cast: ' + actors.join(' • '), 28, 275);
+      }
+      return canvas.toDataURL('image/jpeg', 0.8);
+    }
+
+    function parseVideoFilename(rawFileName, parentFolderName = 'Library') {
+      const extRemoved = rawFileName.replace(/\.[^/.]+$/, '');
+      let working = extRemoved.replace(/[._]/g, ' ').trim();
+      let category = parentFolderName || 'Library';
+
+      const bracketMatch = working.match(/\[([^\]]+)\]/);
+      if (bracketMatch) {
+        category = bracketMatch[1].trim();
+        working = working.replace(bracketMatch[0], '').trim();
+      }
+
+      let resolution = '1080p';
+      if (/\b(4k|2160p|uhd)\b/i.test(working)) {
+        resolution = '4K';
+        working = working.replace(/\b(4k|2160p|uhd)\b/gi, '').replace(/\(\s*\)/g, '').trim();
+      }
+
+      let actors = [];
+      let title = working;
+      if (working.includes(' - ')) {
+        const parts = working.split(' - ');
+        actors = parts[0].split(/,|&|\band\b/i).map(s => s.trim()).filter(Boolean);
+        title = parts.slice(1).join(' - ').trim();
+      }
+      if (!actors.length) actors = ['Unknown Cast'];
+      return { title: title || extRemoved, actors, category, resolution };
+    }
+
+    function extractVideoMediaInfo(srcUrl) {
+      return new Promise((resolve) => {
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.muted = true;
+        v.playsInline = true;
+        v.src = srcUrl;
+        let done = false;
+        const finish = (res) => {
+          if (!done) {
+            done = true;
+            v.removeAttribute('src');
+            v.load();
+            resolve(res);
+          }
+        };
+        const timer = setTimeout(() => finish({ duration: 0, thumbnail: '' }), 4000);
+        v.onloadedmetadata = () => {
+          const d = v.duration || 0;
+          v.currentTime = Math.min(Math.max(2, d * 0.15), Math.max(0, d - 0.5));
+        };
+        v.onseeked = () => {
+          clearTimeout(timer);
+          try {
+            const c = document.createElement('canvas');
+            c.width = 480; c.height = 270;
+            c.getContext('2d').drawImage(v, 0, 0, 480, 270);
+            finish({ duration: v.duration || 0, thumbnail: c.toDataURL('image/jpeg', 0.78) });
+          } catch (e) {
+            finish({ duration: v.duration || 0, thumbnail: '' });
+          }
+        };
+        v.onerror = () => { clearTimeout(timer); finish({ duration: 0, thumbnail: '' }); };
+      });
+    }
+
+    // =========================================================================
+    // 3. STATE & INITIAL DEMO DATA
+    // =========================================================================
+    const state = {
+      videos: [],
+      folders: [],
+      navSection: 'all',
+      selectedCategory: 'All',
+      selectedActor: null,
+      selectedFolderId: null,
+      searchQuery: '',
+      sortBy: 'recommended',
+      activeVideo: null,
+      playerMode: 'hidden', // 'hidden' | 'watch' | 'mini'
+      theaterWide: false,
+      autoplayNext: true,
+      volume: 0.85,
+      isMuted: false,
+      isDraggingTimeline: false,
+      editingVideoId: null,
+      frameCache: new Map(),
+      lastSavedTime: 0
+    };
+
+    const INITIAL_FOLDERS = [
+      { id: 'folder-demo-1', name: 'Movies_4K (Sample)', path: 'Local Browser Demo Cache', status: 'Ready (Local Demo)' },
+      { id: 'folder-demo-2', name: 'Clips_And_Tutorials (Sample)', path: 'Local Browser Demo Cache', status: 'Ready (Local Demo)' }
+    ];
+
+    function createInitialDemoVideos() {
+      const list = [
+        {
+          id: 'demo-vid-1',
+          title: 'Tears of Steel - Cybernetic Uprising in Amsterdam',
+          folderId: 'folder-demo-1',
+          actors: ['Derek de Lint', 'Berenice Bejo'],
+          category: 'Sci-Fi',
+          videoType: 'Movies',
+          resolution: '4K',
+          duration: 734,
+          playCount: 14,
+          totalWatchedSeconds: 1840,
+          reaction: 'like',
+          likesCount: 128,
+          watchProgress: 0.35,
+          lastPositionSeconds: 256,
+          accent: '#1e3a8a',
+          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4'
+        },
+        {
+          id: 'demo-vid-2',
+          title: 'Sintel - The Dragon Seeker Chronicles',
+          folderId: 'folder-demo-1',
+          actors: ['Halina Reijn', 'Thom Hoffman'],
+          category: 'Fantasy',
+          videoType: 'Movies',
+          resolution: '4K',
+          duration: 888,
+          playCount: 29,
+          totalWatchedSeconds: 4120,
+          reaction: 'like',
+          likesCount: 245,
+          watchProgress: 0.72,
+          lastPositionSeconds: 639,
+          accent: '#7c2d12',
+          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
+        },
+        {
+          id: 'demo-vid-3',
+          title: 'Big Buck Bunny - Forest Reckoning',
+          folderId: 'folder-demo-1',
+          actors: ['Jan Morgenstern', 'Sacha Goedegebure'],
+          category: 'Animation',
+          videoType: 'Movies',
+          resolution: '1080p',
+          duration: 596,
+          playCount: 19,
+          totalWatchedSeconds: 920,
+          reaction: null,
+          likesCount: 64,
+          watchProgress: 0.15,
+          lastPositionSeconds: 89,
+          accent: '#14532d',
+          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+        },
+        {
+          id: 'demo-vid-4',
+          title: 'Subaru Outback Street & Rally Track Cinematography',
+          folderId: 'folder-demo-2',
+          actors: ['Ken Block', 'Travis Pastrana'],
+          category: 'Automotive',
+          videoType: 'Clips',
+          resolution: '4K',
+          duration: 594,
+          playCount: 41,
+          totalWatchedSeconds: 3650,
+          reaction: 'like',
+          likesCount: 312,
+          watchProgress: 0.9,
+          lastPositionSeconds: 534,
+          accent: '#831843',
+          videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackSeeTheWorld.mp4'
+        }
+      ];
+      return list.map(v => ({
+        ...v,
+        thumbnailUrl: generateProceduralThumbnail(v.title, v.category, v.actors, v.resolution, v.accent)
+      }));
+    }
+
+    // =========================================================================
+    // 4. RECOMMENDATION ENGINE & ACTIVE PLAYBACK QUEUE
+    // =========================================================================
+    function computeRecommendations() {
+      const actorScores = {};
+      const catScores = {};
+      let totalWatchSec = 0;
+      let totalPlays = 0;
+
+      state.videos.forEach(v => {
+        const isLiked = v.reaction === 'like';
+        const isDisliked = v.reaction === 'dislike';
+        const plays = v.playCount || 0;
+        const watched = v.totalWatchedSeconds || (v.watchProgress || 0) * (v.duration || 0);
+        totalWatchSec += watched;
+        totalPlays += plays;
+
+        let sig = (isLiked ? 40 : 0) - (isDisliked ? 60 : 0) + Math.min(45, plays * 4) + Math.min(50, (watched / 60) * 2.5);
+        (v.actors || []).forEach(a => {
+          if (a && a !== 'Unknown Cast') actorScores[a] = (actorScores[a] || 0) + sig;
+        });
+        if (v.category) catScores[v.category] = (catScores[v.category] || 0) + sig;
+      });
+
+      const meta = {};
+      let maxRaw = 1;
+      state.videos.forEach(v => {
+        let score = 0;
+        let bestActor = null;
+        let bestActSc = 0;
+        (v.actors || []).forEach(a => {
+          const sc = actorScores[a] || 0;
+          score += sc * 0.65;
+          if (sc > bestActSc) { bestActSc = sc; bestActor = a; }
+        });
+        score += (catScores[v.category] || 0) * 0.45;
+        if (v.reaction === 'like') score += 32;
+        if (v.watchProgress > 0.05 && v.watchProgress < 0.92) score += 28;
+        if (v.reaction === 'dislike') score -= 250;
+        if (score > maxRaw) maxRaw = score;
+
+        let reason = 'Recommended for you';
+        if (v.watchProgress > 0.05 && v.watchProgress < 0.92) {
+          reason = `Resume (${Math.round(v.watchProgress * 100)}% watched)`;
+        } else if (v.reaction === 'like' && (v.playCount || 0) > 2) {
+          reason = `Liked & watched ${v.playCount}x`;
+        } else if (bestActor && bestActSc > 20) {
+          reason = `Because you watch ${bestActor}`;
+        }
+        meta[v.id] = { rawScore: score, reason };
+      });
+
+      Object.keys(meta).forEach(id => {
+        meta[id].matchPercent = Math.min(99, Math.max(60, Math.round(64 + (meta[id].rawScore / maxRaw) * 35)));
+      });
+
+      const topActors = Object.entries(actorScores).filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1]).map(([n]) => n);
+      return { meta, totalWatchSec, totalPlays, topActors };
+    }
+
+    function getFilteredSortedVideos() {
+      const recData = computeRecommendations();
+      return state.videos
+        .filter(v => {
+          if (state.navSection === 'liked' && v.reaction !== 'like') return false;
+          if (state.navSection === 'disliked' && v.reaction !== 'dislike') return false;
+          if (state.navSection !== 'disliked' && v.reaction === 'dislike') return false;
+          if (state.selectedFolderId && v.folderId !== state.selectedFolderId) return false;
+          if (state.selectedActor && !(v.actors || []).includes(state.selectedActor)) return false;
+
+          if (state.selectedCategory !== 'All') {
+            if (state.selectedCategory === 'Liked Videos' && v.reaction !== 'like') return false;
+            if (state.selectedCategory === '4K / UHD' && v.resolution !== '4K') return false;
+            if (state.selectedCategory !== 'Liked Videos' && state.selectedCategory !== '4K / UHD' && v.category !== state.selectedCategory && v.videoType !== state.selectedCategory) return false;
+          }
+
+          if (state.searchQuery.trim()) {
+            const q = state.searchQuery.toLowerCase();
+            const mTitle = (v.title || '').toLowerCase().includes(q);
+            const mAct = (v.actors || []).some(a => a.toLowerCase().includes(q));
+            const mCat = (v.category || '').toLowerCase().includes(q);
+            if (!mTitle && !mAct && !mCat) return false;
+          }
+          return true;
+        })
+        .sort((a, b) => {
+          if (state.sortBy === 'recommended') return (recData.meta[b.id]?.rawScore || 0) - (recData.meta[a.id]?.rawScore || 0);
+          if (state.sortBy === 'mostWatched') return (b.totalWatchedSeconds || 0) - (a.totalWatchedSeconds || 0);
+          if (state.sortBy === 'title') return (a.title || '').localeCompare(b.title || '');
+          return 0;
+        });
+    }
+
+    function getPlaybackQueue() {
+      const list = getFilteredSortedVideos();
+      if (list.length > 0) return list;
+      return state.videos.filter(v => v.reaction !== 'dislike');
+    }
+
+    // =========================================================================
+    // 5. DOM REFERENCES & HUD HELPERS
+    // =========================================================================
+    const mainVideo = document.getElementById('mainVideo');
+    const previewVideo = document.getElementById('previewVideo');
+    const previewCanvas = document.createElement('canvas');
+    previewCanvas.width = 240;
+    previewCanvas.height = 135;
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => el.classList.add('hidden'), 3200);
+    }
+
+    let hudTimer = null;
+    function showPlayerHud(text) {
+      const badge = document.getElementById('playerHudBadge');
+      badge.textContent = text;
+      badge.classList.remove('hidden');
+      clearTimeout(hudTimer);
+      hudTimer = setTimeout(() => badge.classList.add('hidden'), 950);
+    }
+
+    // =========================================================================
+    // 6. PLAYER CONTROLS: PREV/NEXT, ±5s SEEK, VOLUME LOCK & MINIPLAYER
+    // =========================================================================
+    function persistCurrentVideoProgress(addedWatchSec = 0) {
+      const v = state.activeVideo;
+      if (!v || !mainVideo.duration) return;
+      const cur = mainVideo.currentTime || 0;
+      const dur = mainVideo.duration || v.duration || 0;
+      if (dur <= 0) return;
+
+      v.watchProgress = Math.min(1, Math.max(0, cur / dur));
+      v.lastPositionSeconds = cur;
+      v.totalWatchedSeconds = (v.totalWatchedSeconds || 0) + Math.max(0, addedWatchSec);
+      dbPut('videos', v);
+    }
+
+    function playAdjacentVideo(direction = 1) {
+      const queue = getPlaybackQueue();
+      if (!queue.length) return;
+      if (!state.activeVideo) {
+        playVideoById(queue[0].id);
+        return;
+      }
+      const idx = queue.findIndex(v => v.id === state.activeVideo.id);
+      let nextIdx = idx === -1 ? 0 : (idx + direction + queue.length) % queue.length;
+      const target = queue[nextIdx];
+      if (target) {
+        const keepMode = state.playerMode === 'mini' ? 'mini' : 'watch';
+        playVideoById(target.id, keepMode);
+        showPlayerHud(direction > 0 ? `⏭ Next: ${target.title.slice(0, 28)}` : `⏮ Prev: ${target.title.slice(0, 28)}`);
+      }
+    }
+
+    function seekBySeconds(delta) {
+      if (!state.activeVideo || state.playerMode === 'hidden') return;
+      const dur = mainVideo.duration || state.activeVideo.duration || 0;
+      const next = Math.max(0, Math.min(dur || Infinity, (mainVideo.currentTime || 0) + delta));
+      mainVideo.currentTime = next;
+      persistCurrentVideoProgress(0);
+      updateTimelineUI();
+      showPlayerHud(delta > 0 ? `⏩ +${delta}s (${formatDuration(next)})` : `⏪ ${delta}s (${formatDuration(next)})`);
+    }
+
+    function adjustVolumeBy(delta) {
+      if (!state.activeVideo || state.playerMode === 'hidden') return;
+      const base = state.isMuted ? 0 : state.volume;
+      const next = Math.max(0, Math.min(1, Math.round((base + delta) * 100) / 100));
+      state.volume = next;
+      state.isMuted = next === 0;
+      mainVideo.volume = next;
+      mainVideo.muted = state.isMuted;
+      syncVolumeUI();
+      showPlayerHud(state.isMuted ? '🔇 Muted (0%)' : `🔊 Volume ${Math.round(next * 100)}%`);
+    }
+
+    function toggleMute() {
+      state.isMuted = !state.isMuted;
+      if (!state.isMuted && state.volume === 0) state.volume = 0.5;
+      mainVideo.muted = state.isMuted;
+      mainVideo.volume = state.volume;
+      syncVolumeUI();
+      showPlayerHud(state.isMuted ? '🔇 Muted' : `🔊 Volume ${Math.round(state.volume * 100)}%`);
+    }
+
+    function syncVolumeUI() {
+      const eff = state.isMuted ? 0 : state.volume;
+      document.getElementById('volumeSlider').value = eff;
+      document.getElementById('volumeLabel').textContent = `${Math.round(eff * 100)}%`;
+      document.getElementById('muteBtn').textContent = eff === 0 ? '🔇' : eff < 0.5 ? '🔉' : '🔊';
+    }
+
+    function togglePlayPause() {
+      if (!state.activeVideo) return;
+      if (mainVideo.paused) {
+        mainVideo.play().catch(() => {});
+        showPlayerHud('▶ Playing');
+      } else {
+        mainVideo.pause();
+        showPlayerHud('⏸ Paused');
+      }
+    }
+
+    function switchPlayerMode(targetMode) {
+      const snapTime = mainVideo.currentTime || 0;
+      const wasPlaying = !mainVideo.paused;
+      persistCurrentVideoProgress(0);
+
+      state.playerMode = targetMode;
+      renderPlayerLayout();
+
+      requestAnimationFrame(() => {
+        if (snapTime > 0 && Math.abs(mainVideo.currentTime - snapTime) > 0.3) {
+          mainVideo.currentTime = snapTime;
+        }
+        if (wasPlaying && mainVideo.paused) {
+          mainVideo.play().catch(() => {});
+        }
+      });
+      if (targetMode === 'watch') window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Resolve a playable local URL from a cached Blob or native FileSystemFileHandle
+    async function resolvePlayableVideoUrl(video) {
+      if (video.videoUrl || video.blobUrl) return video.videoUrl || video.blobUrl;
+      if (video.cachedFileBlob instanceof Blob) {
+        const url = URL.createObjectURL(video.cachedFileBlob);
+        video.videoUrl = url;
+        return url;
+      }
+      if (video.fileHandle) {
+        try {
+          let perm = await video.fileHandle.queryPermission({ mode: 'read' });
+          if (perm !== 'granted') {
+            perm = await video.fileHandle.requestPermission({ mode: 'read' });
+          }
+          if (perm === 'granted') {
+            const file = await video.fileHandle.getFile();
+            const url = URL.createObjectURL(file);
+            video.videoUrl = url;
+            return url;
+          }
+        } catch (e) {}
+      }
+      return null;
+    }
+
+    async function playVideoById(videoId, preferredMode = 'watch') {
+      const video = state.videos.find(v => v.id === videoId);
+      if (!video) return;
+
+      if (state.activeVideo && state.activeVideo.id === video.id) {
+        switchPlayerMode(preferredMode);
+        if (mainVideo.paused) mainVideo.play().catch(() => {});
+        return;
+      }
+
+      if (state.activeVideo && mainVideo.currentTime > 0) {
+        persistCurrentVideoProgress(0);
+      }
+
+      state.frameCache.clear();
+      video.playCount = (video.playCount || 0) + 1;
+      dbPut('videos', video);
+
+      state.activeVideo = video;
+      state.playerMode = preferredMode;
+
+      const playSrc = await resolvePlayableVideoUrl(video);
+      const permOverlay = document.getElementById('handlePermissionOverlay');
+
+      if (!playSrc) {
+        permOverlay.classList.remove('hidden');
+        renderAll();
+        return;
+      } else {
+        permOverlay.classList.add('hidden');
+      }
+
+      const resumeTime = (video.lastPositionSeconds && video.duration && video.lastPositionSeconds < video.duration - 5)
+        ? video.lastPositionSeconds
+        : 0;
+      state.lastSavedTime = resumeTime;
+
+      mainVideo.src = playSrc;
+      previewVideo.src = playSrc;
+      mainVideo.volume = state.volume;
+      mainVideo.muted = state.isMuted;
+
+      mainVideo.onloadedmetadata = () => {
+        if (resumeTime > 0 && resumeTime < mainVideo.duration) {
+          mainVideo.currentTime = resumeTime;
+        }
+        mainVideo.play().catch(() => {});
+        updateTimelineUI();
+      };
+
+      renderAll();
+      if (preferredMode === 'watch') window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function updateTimelineUI() {
+      const v = state.activeVideo;
+      if (!v) return;
+      const cur = mainVideo.currentTime || 0;
+      const dur = mainVideo.duration || v.duration || 0;
+      const pct = dur > 0 ? Math.min(100, (cur / dur) * 100) : 0;
+
+      document.getElementById('timelineProgressBar').style.width = `${pct}%`;
+      document.getElementById('timelineKnob').style.left = `${pct}%`;
+      document.getElementById('timeDisplay').textContent = `${formatDuration(cur)} / ${formatDuration(dur)}`;
+      document.getElementById('playPauseBtn').textContent = mainVideo.paused ? '▶' : '⏸';
+
+      if (state.playerMode === 'mini') {
+        document.getElementById('miniMeta').textContent = `${formatDuration(cur)} / ${formatDuration(dur)} • ${(v.actors || []).join(', ')}`;
+      }
+    }
+
+    mainVideo.addEventListener('timeupdate', () => {
+      updateTimelineUI();
+      const now = mainVideo.currentTime || 0;
+      const delta = now - state.lastSavedTime;
+      if (Math.abs(delta) >= 2) {
+        state.lastSavedTime = now;
+        persistCurrentVideoProgress(delta > 0 && delta < 15 ? delta : 2);
+      }
+    });
+    mainVideo.addEventListener('play', updateTimelineUI);
+    mainVideo.addEventListener('pause', () => {
+      updateTimelineUI();
+      persistCurrentVideoProgress(0);
+    });
+    mainVideo.addEventListener('ended', () => {
+      if (state.autoplayNext) {
+        playAdjacentVideo(1);
+      }
+    });
+    mainVideo.addEventListener('click', togglePlayPause);
+
+    // =========================================================================
+    // 7. TIMELINE HOVER MINI-THUMBNAIL SCRUBBER
+    // =========================================================================
+    const timelineBar = document.getElementById('timelineBar');
+    const previewPopup = document.getElementById('timelinePreviewPopup');
+    const previewImg = document.getElementById('timelinePreviewImg');
+    const previewTimeLabel = document.getElementById('timelinePreviewTime');
+    const ghostBar = document.getElementById('timelineGhostBar');
+
+    previewVideo.addEventListener('seeked', () => {
+      if (!state.activeVideo) return;
+      const sec = Math.max(0, Math.floor(previewVideo.currentTime || 0));
+      const key = `${state.activeVideo.id}::${sec}`;
+      try {
+        const ctx = previewCanvas.getContext('2d');
+        ctx.drawImage(previewVideo, 0, 0, previewCanvas.width, previewCanvas.height);
+        const url = previewCanvas.toDataURL('image/jpeg', 0.72);
+        state.frameCache.set(key, url);
+        previewImg.src = url;
+      } catch (e) {
+        const fallback = generateProceduralThumbnail(
+          state.activeVideo.title,
+          state.activeVideo.category,
+          state.activeVideo.actors,
+          state.activeVideo.resolution,
+          state.activeVideo.accent || '#1e3a8a',
+          sec
+        );
+        state.frameCache.set(key, fallback);
+        previewImg.src = fallback;
+      }
+    });
+
+    function handleTimelinePointer(clientX, shouldSeekVideo = false) {
+      if (!state.activeVideo) return;
+      const rect = timelineBar.getBoundingClientRect();
+      const clampedX = Math.max(0, Math.min(rect.width, clientX - rect.left));
+      const ratio = rect.width > 0 ? clampedX / rect.width : 0;
+      const pct = ratio * 100;
+      const dur = mainVideo.duration || state.activeVideo.duration || 0;
+      const targetSec = ratio * dur;
+
+      previewPopup.classList.remove('hidden');
+      previewPopup.style.left = `${Math.min(88, Math.max(12, pct))}%`;
+      previewTimeLabel.textContent = formatDuration(targetSec);
+
+      ghostBar.classList.remove('hidden');
+      ghostBar.style.width = `${pct}%`;
+
+      const rounded = Math.max(0, Math.floor(targetSec));
+      const key = `${state.activeVideo.id}::${rounded}`;
+      if (state.frameCache.has(key)) {
+        previewImg.src = state.frameCache.get(key);
+      } else {
+        previewImg.src = state.activeVideo.thumbnailUrl;
+        if (!previewVideo.seeking) {
+          try { previewVideo.currentTime = rounded; } catch (e) {}
+        }
+      }
+
+      if (shouldSeekVideo && dur > 0) {
+        mainVideo.currentTime = targetSec;
+        persistCurrentVideoProgress(0);
+        updateTimelineUI();
+      }
+    }
+
+    timelineBar.addEventListener('mousemove', (e) => {
+      handleTimelinePointer(e.clientX, state.isDraggingTimeline);
+    });
+    timelineBar.addEventListener('mousedown', (e) => {
+      state.isDraggingTimeline = true;
+      handleTimelinePointer(e.clientX, true);
+    });
+    timelineBar.addEventListener('mouseleave', () => {
+      if (!state.isDraggingTimeline) {
+        previewPopup.classList.add('hidden');
+        ghostBar.classList.add('hidden');
+      }
+    });
+    window.addEventListener('mouseup', () => {
+      if (state.isDraggingTimeline) {
+        state.isDraggingTimeline = false;
+        previewPopup.classList.add('hidden');
+        ghostBar.classList.add('hidden');
+      }
+    });
+
+    // =========================================================================
+    // 8. KEYBOARD SHORTCUTS (⬅/➡ ±5s, ⬆/⬇ Volume, Shift+P/N Prev/Next)
+    // =========================================================================
+    window.addEventListener('keydown', (e) => {
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+      if (!state.activeVideo || state.playerMode === 'hidden') return;
+
+      if (e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        playAdjacentVideo(1);
+      } else if (e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        playAdjacentVideo(-1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        seekBySeconds(5);
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        seekBySeconds(-5);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        adjustVolumeBy(0.05);
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        adjustVolumeBy(-0.05);
+      } else if (e.key === ' ' || e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        togglePlayPause();
+      } else if (e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        toggleMute();
+      } else if (e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        switchPlayerMode(state.playerMode === 'watch' ? 'mini' : 'watch');
+      }
+    }, { passive: false });
+
+    // =========================================================================
+    // 9. RENDERING UI
+    // =========================================================================
+    function handleReaction(videoId, targetReaction) {
+      const v = state.videos.find(item => item.id === videoId);
+      if (!v) return;
+      const cur = v.reaction || null;
+      const next = cur === targetReaction ? null : targetReaction;
+      let likes = v.likesCount || 0;
+      if (cur === 'like' && next !== 'like') likes = Math.max(0, likes - 1);
+      else if (cur !== 'like' && next === 'like') likes += 1;
+
+      v.reaction = next;
+      v.likesCount = likes;
+      dbPut('videos', v);
+      showToast(next === 'like' ? 'Added to Liked Videos' : next === 'dislike' ? 'Disliked video' : 'Reaction removed');
+      renderAll();
+    }
+
+    function renderPlayerLayout() {
+      const sec = document.getElementById('playerSection');
+      const innerCol = document.getElementById('playerInnerCol');
+      const topBar = document.getElementById('watchTopBar');
+      const miniOverlay = document.getElementById('miniOverlayControls');
+      const miniFooter = document.getElementById('miniFooter');
+      const watchDetails = document.getElementById('watchDetails');
+      const upNextCol = document.getElementById('upNextCol');
+
+      if (!state.activeVideo || state.playerMode === 'hidden') {
+        sec.className = 'hidden';
+        return;
+      }
+
+      const v = state.activeVideo;
+      const rec = computeRecommendations().meta[v.id];
+      const queue = getPlaybackQueue();
+      const curIndex = queue.findIndex(item => item.id === v.id);
+
+      if (state.playerMode === 'mini') {
+        sec.className = 'fixed bottom-4 right-4 z-50 w-80 sm:w-96 bg-[#181818] border border-white/20 rounded-2xl shadow-2xl overflow-hidden';
+        innerCol.className = 'w-full';
+        topBar.classList.add('hidden');
+        miniOverlay.classList.remove('hidden');
+        miniFooter.classList.remove('hidden');
+        watchDetails.classList.add('hidden');
+        upNextCol.classList.add('hidden');
+        document.getElementById('miniTitle').textContent = v.title;
+      } else {
+        sec.className = `grid grid-cols-1 ${state.theaterWide ? 'lg:grid-cols-1' : 'lg:grid-cols-3'} gap-6 bg-[#141414] p-4 lg:p-6 rounded-2xl border border-white/10`;
+        innerCol.className = state.theaterWide ? 'w-full space-y-4' : 'lg:col-span-2 space-y-4';
+        topBar.classList.remove('hidden');
+        miniOverlay.classList.add('hidden');
+        miniFooter.classList.add('hidden');
+        watchDetails.classList.remove('hidden');
+        if (state.theaterWide) upNextCol.classList.add('hidden');
+        else upNextCol.classList.remove('hidden');
+
+        document.getElementById('watchTitle').textContent = v.title;
+        document.getElementById('watchSubMeta').innerHTML = `
+          <span class="text-emerald-400 font-semibold">${rec ? rec.matchPercent : 95}% Match</span>
+          <span>• ${v.category || 'Library'}</span>
+          <span>• ${v.resolution || '1080p'}</span>
+          <span>• Watched ${v.playCount || 1}x</span>
+          <span class="text-zinc-500">• 🔒 Local Stream</span>
+        `;
+
+        const likeBtn = document.getElementById('watchLikeBtn');
+        const dislikeBtn = document.getElementById('watchDislikeBtn');
+        document.getElementById('watchLikeCount').textContent = v.likesCount || 0;
+        likeBtn.className = `flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold transition ${
+          v.reaction === 'like' ? 'bg-white text-black' : 'text-white hover:bg-[#383838]'
+        }`;
+        dislikeBtn.className = `flex items-center gap-1 px-3.5 py-1.5 text-xs font-semibold transition ${
+          v.reaction === 'dislike' ? 'bg-red-600 text-white' : 'text-white hover:bg-[#383838]'
+        }`;
+
+        const actorsBar = document.getElementById('watchActorsBar');
+        actorsBar.innerHTML = `<span class="text-xs text-zinc-400 font-semibold mr-1">Cast (Click to Filter):</span>`;
+        (v.actors || []).forEach(actor => {
+          const btn = document.createElement('button');
+          btn.className = 'bg-[#272727] hover:bg-red-600 text-white text-xs px-3 py-1 rounded-full transition';
+          btn.textContent = actor;
+          btn.onclick = () => {
+            state.selectedActor = actor;
+            switchPlayerMode('mini');
+            renderAll();
+          };
+          actorsBar.appendChild(btn);
+        });
+
+        // Queue Position & Up Next List
+        document.getElementById('queuePositionLabel').textContent = curIndex !== -1 ? `Playing ${curIndex + 1} of ${queue.length}` : `${queue.length} videos`;
+        const upNextList = document.getElementById('upNextList');
+        upNextList.innerHTML = '';
+
+        // Order queue starting from current video
+        const orderedQueue = curIndex !== -1
+          ? [...queue.slice(curIndex + 1), ...queue.slice(0, curIndex)]
+          : queue.filter(item => item.id !== v.id);
+
+        orderedQueue.slice(0, 12).forEach((item, idx) => {
+          const itemRec = computeRecommendations().meta[item.id];
+          const row = document.createElement('div');
+          row.className = 'flex gap-3 p-1.5 rounded-xl hover:bg-[#222] cursor-pointer group transition';
+          row.onclick = () => playVideoById(item.id, 'watch');
+          row.innerHTML = `
+            <div class="relative w-36 aspect-video bg-black rounded-lg overflow-hidden shrink-0">
+              <img src="${item.thumbnailUrl}" class="w-full h-full object-cover" />
+              ${idx === 0 ? `<span class="absolute top-1 left-1 bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">NEXT UP</span>` : ''}
+              <span class="absolute bottom-1 right-1 bg-black/85 text-[10px] px-1.5 py-0.5 rounded">${formatDuration(item.duration)}</span>
+            </div>
+            <div class="min-w-0 flex-1">
+              <h4 class="text-xs font-semibold text-white line-clamp-2 group-hover:text-blue-400">${item.title}</h4>
+              <p class="text-[11px] text-zinc-400 truncate mt-0.5">${(item.actors || []).join(', ')}</p>
+              <span class="inline-block mt-1 text-[10px] text-emerald-400 font-medium">${itemRec ? itemRec.matchPercent + '% • ' + itemRec.reason : ''}</span>
+            </div>
+          `;
+          upNextList.appendChild(row);
+        });
+      }
+      updateTimelineUI();
+    }
+
+    function renderAll() {
+      const recData = computeRecommendations();
+
+      document.getElementById('folderCountBadge').textContent = state.folders.length;
+
+      // Check if any Native Directory Handle folder needs session permission re-grant
+      const needsReconnect = state.folders.some(f => f.dirHandle && f.needsPermission);
+      document.getElementById('reconnectBannerBtn').classList.toggle('hidden', !needsReconnect);
+
+      // Sidebar Nav Sections
+      const navItems = [
+        { id: 'all', label: 'Home / Recommended', count: state.videos.filter(v => v.reaction !== 'dislike').length },
+        { id: 'liked', label: '👍 Liked Videos', count: state.videos.filter(v => v.reaction === 'like').length },
+        { id: 'disliked', label: '👎 Disliked / Hidden', count: state.videos.filter(v => v.reaction === 'dislike').length }
+      ];
+      const navList = document.getElementById('navSectionList');
+      navList.innerHTML = '';
+      navItems.forEach(item => {
+        const b = document.createElement('button');
+        b.className = `w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition ${
+          state.navSection === item.id ? 'bg-[#272727] text-white font-bold' : 'text-zinc-300 hover:bg-[#1f1f1f]'
+        }`;
+        b.innerHTML = `<span>${item.label}</span><span class="text-zinc-400">${item.count}</span>`;
+        b.onclick = () => {
+          state.navSection = item.id;
+          state.selectedActor = null;
+          state.selectedFolderId = null;
+          if (state.playerMode === 'watch') switchPlayerMode('mini');
+          renderAll();
+        };
+        navList.appendChild(b);
+      });
+
+      // Sidebar Folders
+      const sideFolders = document.getElementById('sidebarFoldersList');
+      sideFolders.innerHTML = '';
+      state.folders.forEach(f => {
+        const b = document.createElement('button');
+        b.className = `w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs truncate ${
+          state.selectedFolderId === f.id ? 'bg-[#272727] text-red-400 font-bold' : 'text-zinc-300 hover:bg-[#1f1f1f]'
+        }`;
+        b.innerHTML = `<span class="truncate">📁 ${f.name}</span>${f.needsPermission ? '<span class="text-[10px] text-amber-400 ml-1">⚡</span>' : ''}`;
+        b.onclick = () => {
+          state.selectedFolderId = state.selectedFolderId === f.id ? null : f.id;
+          if (state.playerMode === 'watch') switchPlayerMode('mini');
+          renderAll();
+        };
+        sideFolders.appendChild(b);
+      });
+
+      // Sidebar Actors
+      const actorMap = new Map();
+      state.videos.forEach(v => {
+        (v.actors || []).forEach(a => {
+          if (!a || a === 'Unknown Cast') return;
+          actorMap.set(a, (actorMap.get(a) || 0) + 1);
+        });
+      });
+      const actorsArr = Array.from(actorMap.entries()).sort((a, b) => b[1] - a[1]);
+      document.getElementById('actorCountBadge').textContent = actorsArr.length;
+      const resetActorBtn = document.getElementById('resetActorBtn');
+      if (state.selectedActor) resetActorBtn.classList.remove('hidden');
+      else resetActorBtn.classList.add('hidden');
+
+      const sideActors = document.getElementById('sidebarActorsList');
+      sideActors.innerHTML = '';
+      actorsArr.forEach(([name, count]) => {
+        const b = document.createElement('button');
+        b.className = `w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs transition ${
+          state.selectedActor === name ? 'bg-white text-black font-bold' : 'text-zinc-300 hover:bg-[#1f1f1f]'
+        }`;
+        b.innerHTML = `<span class="truncate">${name}</span><span class="text-[11px] opacity-70">${count}</span>`;
+        b.onclick = () => {
+          state.selectedActor = state.selectedActor === name ? null : name;
+          if (state.playerMode === 'watch') switchPlayerMode('mini');
+          renderAll();
+        };
+        sideActors.appendChild(b);
+      });
+
+      // Category Pills
+      const baseCats = ['All', 'Liked Videos', '4K / UHD', 'Movies', 'Clips'];
+      const extraCats = new Set();
+      state.videos.forEach(v => { if (v.category && !baseCats.includes(v.category)) extraCats.add(v.category); });
+      const allCats = [...baseCats, ...Array.from(extraCats)];
+      const catContainer = document.getElementById('categoryPillsContainer');
+      catContainer.innerHTML = '';
+      allCats.forEach(cat => {
+        const b = document.createElement('button');
+        b.className = `px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+          state.selectedCategory === cat ? 'bg-white text-black font-bold' : 'bg-[#272727] text-zinc-200 hover:bg-[#383838]'
+        }`;
+        b.textContent = cat;
+        b.onclick = () => {
+          state.selectedCategory = cat;
+          renderAll();
+        };
+        catContainer.appendChild(b);
+      });
+
+      // Active Actor Chip
+      const actorChip = document.getElementById('activeActorChip');
+      if (state.selectedActor) {
+        actorChip.classList.remove('hidden');
+        actorChip.classList.add('flex');
+        actorChip.innerHTML = `<span>Actor: ${state.selectedActor}</span><button id="clearActorChipBtn">✕</button>`;
+        document.getElementById('clearActorChipBtn').onclick = () => {
+          state.selectedActor = null;
+          renderAll();
+        };
+      } else {
+        actorChip.classList.add('hidden');
+      }
+
+      // Recommended Shelf
+      const recShelf = document.getElementById('recommendedShelf');
+      if (state.navSection === 'all' && !state.selectedActor && state.selectedCategory === 'All' && !state.searchQuery) {
+        recShelf.classList.remove('hidden');
+        document.getElementById('recStatsBadge').textContent = `${recData.totalPlays} Total Plays • ${Math.round(recData.totalWatchSec / 60)} Mins Watched`;
+        document.getElementById('recSubtitle').textContent = `Computed 100% locally in your browser from your Likes, play frequency, and watch time.${
+          recData.topActors.length ? ' Top Cast Affinity: ' + recData.topActors.slice(0, 3).join(', ') : ''
+        }`;
+        const recGrid = document.getElementById('recommendedGrid');
+        recGrid.innerHTML = '';
+        [...state.videos]
+          .filter(v => v.reaction !== 'dislike')
+          .sort((a, b) => (recData.meta[b.id]?.rawScore || 0) - (recData.meta[a.id]?.rawScore || 0))
+          .slice(0, 4)
+          .forEach(video => {
+            const rm = recData.meta[video.id];
+            const card = document.createElement('div');
+            card.className = 'bg-[#121212]/90 border border-white/10 hover:border-red-500/60 rounded-xl overflow-hidden cursor-pointer group transition';
+            card.onclick = () => playVideoById(video.id, 'watch');
+            card.innerHTML = `
+              <div class="relative aspect-video bg-black">
+                <img src="${video.thumbnailUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                <span class="absolute top-2 left-2 bg-emerald-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded">${rm ? rm.matchPercent : 95}% Match</span>
+                <span class="absolute bottom-2 right-2 bg-black/85 text-white text-[11px] px-1.5 py-0.5 rounded">${formatDuration(video.duration)}</span>
+                ${video.watchProgress > 0 ? `<div class="absolute bottom-0 left-0 right-0 h-1 bg-white/20"><div class="h-full bg-red-600" style="width:${video.watchProgress * 100}%"></div></div>` : ''}
+              </div>
+              <div class="p-3 space-y-1">
+                <div class="text-[11px] text-amber-300 font-medium truncate">${rm ? rm.reason : ''}</div>
+                <h4 class="text-xs font-bold text-white truncate">${video.title}</h4>
+                <p class="text-[11px] text-zinc-400 truncate">${(video.actors || []).join(', ')}</p>
+              </div>
+            `;
+            recGrid.appendChild(card);
+          });
+      } else {
+        recShelf.classList.add('hidden');
+      }
+
+      // Main Video Grid
+      const filtered = getFilteredSortedVideos();
+      const grid = document.getElementById('videoGrid');
+      grid.innerHTML = '';
+      filtered.forEach(video => {
+        const rm = recData.meta[video.id];
+        const card = document.createElement('div');
+        card.className = 'group cursor-pointer flex flex-col';
+        card.onclick = () => playVideoById(video.id, 'watch');
+
+        card.innerHTML = `
+          <div class="relative aspect-video bg-[#181818] rounded-xl overflow-hidden border border-white/5 group-hover:border-white/25 transition">
+            <img src="${video.thumbnailUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+            ${video.resolution ? `<span class="absolute top-2 left-2 bg-black/80 text-amber-400 text-[10px] font-bold px-1.5 py-0.5 rounded">${video.resolution}</span>` : ''}
+            <span class="absolute bottom-2 right-2 bg-black/85 text-white text-xs px-1.5 py-0.5 rounded font-medium">${formatDuration(video.duration)}</span>
+            ${video.watchProgress > 0 ? `<div class="absolute bottom-0 left-0 right-0 h-1 bg-white/25"><div class="h-full bg-red-600" style="width:${video.watchProgress * 100}%"></div></div>` : ''}
+          </div>
+          <div class="mt-2.5 flex flex-col flex-1 justify-between">
+            <div>
+              <div class="flex items-start justify-between gap-2">
+                <h3 class="text-sm font-bold text-white line-clamp-2 group-hover:text-blue-400 leading-snug">${video.title}</h3>
+                <button class="edit-btn text-xs text-zinc-400 hover:text-white px-1" title="Edit Metadata">✎</button>
+              </div>
+              <div class="actor-links flex flex-wrap gap-1 mt-1"></div>
+            </div>
+            <div class="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-white/5">
+              <span class="text-[11px] text-emerald-400 truncate">${rm ? rm.matchPercent + '% • ' + rm.reason : video.category}</span>
+              <div class="reaction-box inline-flex items-center bg-[#222] rounded-full overflow-hidden border border-white/10 shrink-0">
+                <button class="like-btn px-2.5 py-1 text-[11px] font-semibold flex items-center gap-1 transition ${video.reaction === 'like' ? 'bg-white text-black' : 'text-zinc-300 hover:bg-[#333]'}">
+                  <span>👍</span><span>${video.likesCount || 0}</span>
+                </button>
+                <div class="w-px h-3.5 bg-white/10"></div>
+                <button class="dislike-btn px-2 py-1 text-[11px] transition ${video.reaction === 'dislike' ? 'bg-red-600 text-white' : 'text-zinc-300 hover:bg-[#333]'}">👎</button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        card.querySelector('.edit-btn').onclick = (e) => {
+          e.stopPropagation();
+          openEditModal(video);
+        };
+        const actorContainer = card.querySelector('.actor-links');
+        (video.actors || []).forEach(actor => {
+          const sp = document.createElement('span');
+          sp.className = 'text-xs text-zinc-400 hover:text-white hover:underline';
+          sp.textContent = actor;
+          sp.onclick = (e) => {
+            e.stopPropagation();
+            state.selectedActor = actor;
+            renderAll();
+          };
+          actorContainer.appendChild(sp);
+        });
+        card.querySelector('.like-btn').onclick = (e) => {
+          e.stopPropagation();
+          handleReaction(video.id, 'like');
+        };
+        card.querySelector('.dislike-btn').onclick = (e) => {
+          e.stopPropagation();
+          handleReaction(video.id, 'dislike');
+        };
+
+        grid.appendChild(card);
+      });
+
+      renderModalFolders();
+      renderPlayerLayout();
+    }
+
+    function renderModalFolders() {
+      const list = document.getElementById('modalFolderList');
+      list.innerHTML = '';
+      state.folders.forEach(f => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between p-3 bg-[#121212] border border-white/10 rounded-xl text-xs gap-2';
+        item.innerHTML = `
+          <div class="min-w-0 pr-2">
+            <div class="font-bold text-white truncate">${f.name}</div>
+            <div class="text-zinc-400 truncate text-[11px]">${f.path}</div>
+            ${f.status ? `<div class="text-[10px] ${f.needsPermission ? 'text-amber-400' : 'text-emerald-400'} mt-0.5">${f.status}</div>` : ''}
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            ${f.dirHandle ? `<button class="rescan-folder-btn bg-blue-600/20 text-blue-300 hover:bg-blue-600/30 px-2.5 py-1 rounded-lg">${f.needsPermission ? '⚡ Unlock' : 'Sync'}</button>` : ''}
+            <button class="remove-folder-btn bg-red-600/20 text-red-400 hover:bg-red-600/30 px-2.5 py-1 rounded-lg">Remove</button>
+          </div>
+        `;
+        if (f.dirHandle) {
+          item.querySelector('.rescan-folder-btn').onclick = () => scanAndIndexDirectoryHandle(f.dirHandle, f.id);
+        }
+        item.querySelector('.remove-folder-btn').onclick = async () => {
+          await dbDelete('folders', f.id);
+          const toDel = state.videos.filter(v => v.folderId === f.id);
+          for (const v of toDel) await dbDelete('videos', v.id);
+          state.folders = state.folders.filter(x => x.id !== f.id);
+          state.videos = state.videos.filter(x => x.folderId !== f.id);
+          showToast(`Removed folder "${f.name}" from local index`);
+          renderAll();
+        };
+        list.appendChild(item);
+      });
+    }
+
+    // =========================================================================
+    // 10. CLOUD-TO-LOCAL FOLDER LINKING (NATIVE HANDLE + UNIVERSAL CACHE)
+    // =========================================================================
+    async function walkNativeDirectoryHandle(dirHandle, parentName = '', depth = 4) {
+      if (depth < 0) return [];
+      const results = [];
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file' && isVideoFilename(entry.name)) {
+          results.push({ fileHandle: entry, name: entry.name, parentDir: parentName || dirHandle.name });
+        } else if (entry.kind === 'directory' && !entry.name.startsWith('.')) {
+          const sub = await walkNativeDirectoryHandle(entry, entry.name, depth - 1);
+          results.push(...sub);
+        }
+      }
+      return results;
+    }
+
+    async function scanAndIndexDirectoryHandle(dirHandle, existingFolderId = null) {
+      try {
+        let perm = await dirHandle.queryPermission({ mode: 'read' });
+        if (perm !== 'granted') {
+          perm = await dirHandle.requestPermission({ mode: 'read' });
+        }
+        if (perm !== 'granted') {
+          showToast('Read permission was not granted for local folder.');
+          return;
+        }
+
+        const folderName = dirHandle.name;
+        const folderId = existingFolderId || `folder_handle_${folderName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const badge = document.getElementById('scanStatusBadge');
+        badge.classList.remove('hidden');
+        badge.textContent = `Scanning "${folderName}"...`;
+
+        const entries = await walkNativeDirectoryHandle(dirHandle, folderName);
+        const existingMap = new Map(state.videos.map(v => [v.id, v]));
+        const indexedVideos = [];
+
+        for (let i = 0; i < entries.length; i++) {
+          const item = entries[i];
+          const vidId = `${folderId}::${item.parentDir}::${item.name}`;
+          badge.textContent = `Indexing (${i + 1}/${entries.length}): ${item.name}`;
+
+          const file = await item.fileHandle.getFile();
+          const blobUrl = URL.createObjectURL(file);
+          const prev = existingMap.get(vidId);
+
+          if (prev && prev.thumbnailUrl) {
+            const restored = { ...prev, fileHandle: item.fileHandle, videoUrl: blobUrl };
+            await dbPut('videos', restored);
+            indexedVideos.push(restored);
+          } else {
+            const parsed = parseVideoFilename(item.name, item.parentDir);
+            const media = await extractVideoMediaInfo(blobUrl);
+            const thumb = media.thumbnail || generateProceduralThumbnail(parsed.title, parsed.category, parsed.actors, parsed.resolution);
+
+            const vidObj = {
+              id: vidId,
+              folderId,
+              title: parsed.title,
+              actors: parsed.actors,
+              category: parsed.category,
+              videoType: parsed.category,
+              resolution: parsed.resolution,
+              duration: media.duration || 0,
+              playCount: 0,
+              totalWatchedSeconds: 0,
+              reaction: null,
+              likesCount: 0,
+              watchProgress: 0,
+              lastPositionSeconds: 0,
+              thumbnailUrl: thumb,
+              videoUrl: blobUrl,
+              fileHandle: item.fileHandle
+            };
+            await dbPut('videos', vidObj);
+            indexedVideos.push(vidObj);
+          }
+        }
+
+        const folderRec = {
+          id: folderId,
+          name: folderName,
+          path: `Local PC Handle :: ${folderName} (${indexedVideos.length} videos)`,
+          status: 'Connected (0 Bytes Uploaded • Native Local Handle)',
+          dirHandle,
+          needsPermission: false
+        };
+        await dbPut('folders', folderRec);
+
+        state.folders = [...state.folders.filter(f => f.id !== folderId), folderRec];
+        state.videos = [...state.videos.filter(v => v.folderId !== folderId), ...indexedVideos];
+        badge.classList.add('hidden');
+        showToast(`Linked & indexed ${indexedVideos.length} local videos from "${folderName}"!`);
+        renderAll();
+      } catch (err) {
+        document.getElementById('scanStatusBadge').classList.add('hidden');
+      }
+    }
+
+    async function handleLinkNativeFolder() {
+      if ('showDirectoryPicker' in window) {
+        try {
+          const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+          await scanAndIndexDirectoryHandle(dirHandle);
+          return;
+        } catch (e) {
+          if (e && e.name === 'AbortError') return;
+        }
+      }
+      // Automatic fallback for embedded frames or non-Chromium browsers
+      document.getElementById('dirInput').click();
+    }
+
+    async function handleFilesSelected(e) {
+      const files = Array.from(e.target.files || []);
+      const videoFiles = files.filter(f => isVideoFilename(f.name));
+
+      if (!videoFiles.length) {
+        showToast('No supported video files found in selection.');
+        e.target.value = '';
+        return;
+      }
+
+      const cacheBlobs = document.getElementById('cacheToggleCheckbox').checked;
+      const firstRel = videoFiles[0].webkitRelativePath || '';
+      const folderName = firstRel.includes('/') ? firstRel.split('/')[0] : `PC_Folder_${state.folders.length + 1}`;
+      const folderId = `folder_cached_${folderName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+      const badge = document.getElementById('scanStatusBadge');
+      badge.classList.remove('hidden');
+
+      const newVideos = [];
+      for (let i = 0; i < videoFiles.length; i++) {
+        const file = videoFiles[i];
+        badge.textContent = `Caching (${i + 1}/${videoFiles.length}): ${file.name}`;
+        const blobUrl = URL.createObjectURL(file);
+        const parsed = parseVideoFilename(file.name, folderName);
+        const media = await extractVideoMediaInfo(blobUrl);
+        const thumb = media.thumbnail || generateProceduralThumbnail(parsed.title, parsed.category, parsed.actors, parsed.resolution);
+
+        const vidObj = {
+          id: `${folderId}::${file.name}`,
+          folderId,
+          title: parsed.title,
+          actors: parsed.actors,
+          category: parsed.category,
+          videoType: parsed.category,
+          resolution: parsed.resolution,
+          duration: media.duration || 0,
+          playCount: 0,
+          totalWatchedSeconds: 0,
+          reaction: null,
+          likesCount: 0,
+          watchProgress: 0,
+          lastPositionSeconds: 0,
+          thumbnailUrl: thumb,
+          videoUrl: blobUrl,
+          cachedFileBlob: cacheBlobs ? file : null
+        };
+        await dbPut('videos', vidObj);
+        newVideos.push(vidObj);
+      }
+
+      const folderRec = {
+        id: folderId,
+        name: folderName,
+        path: `Local IndexedDB Cache :: ${folderName} (${newVideos.length} videos)`,
+        status: cacheBlobs ? 'Cached in Local Browser DB (Instant Load)' : 'Index Cached Locally'
+      };
+      await dbPut('folders', folderRec);
+
+      state.folders = [...state.folders.filter(f => f.id !== folderId), folderRec];
+      state.videos = [...state.videos.filter(v => v.folderId !== folderId), ...newVideos];
+      badge.classList.add('hidden');
+      e.target.value = '';
+      showToast(`Cached ${newVideos.length} videos from "${folderName}" locally!`);
+      renderAll();
+    }
+
+    // Export / Import Local Index JSON
+    function exportLocalIndexJson() {
+      const exportPayload = {
+        exportedAt: new Date().toISOString(),
+        folders: state.folders.map(f => ({ id: f.id, name: f.name, path: f.path, status: f.status })),
+        videos: state.videos.map(v => {
+          const copy = { ...v };
+          delete copy.cachedFileBlob;
+          delete copy.fileHandle;
+          delete copy.videoUrl;
+          delete copy.blobUrl;
+          return copy;
+        })
+      };
+      const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'localtube_index_backup.json';
+      a.click();
+      showToast('Exported local index backup (.json)');
+    }
+
+    function importLocalIndexJson(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (Array.isArray(data.videos)) {
+            for (const v of data.videos) await dbPut('videos', v);
+            state.videos = data.videos;
+          }
+          if (Array.isArray(data.folders)) {
+            for (const f of data.folders) await dbPut('folders', f);
+            state.folders = data.folders;
+          }
+          showToast('Imported local index backup!');
+          renderAll();
+        } catch (err) {
+          showToast('Invalid JSON backup file.');
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    function openEditModal(video) {
+      state.editingVideoId = video.id;
+      document.getElementById('editTitleInput').value = video.title || '';
+      document.getElementById('editActorsInput').value = (video.actors || []).join(', ');
+      document.getElementById('editCategoryInput').value = video.category || '';
+      document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    // Wire UI Buttons
+    document.getElementById('dirInput').onchange = handleFilesSelected;
+    document.getElementById('fileInput').onchange = handleFilesSelected;
+    document.getElementById('importJsonInput').onchange = importLocalIndexJson;
+
+    document.getElementById('sidebarAddFolderBtn').onclick = handleLinkNativeFolder;
+    document.getElementById('modalNativeHandleBtn').onclick = handleLinkNativeFolder;
+    document.getElementById('modalPickFolderBtn').onclick = () => document.getElementById('dirInput').click();
+    document.getElementById('modalPickFilesBtn').onclick = () => document.getElementById('fileInput').click();
+    document.getElementById('exportIndexBtn').onclick = exportLocalIndexJson;
+    document.getElementById('importIndexBtn').onclick = () => document.getElementById('importJsonInput').click();
+    document.getElementById('privacyBadgeBtn').onclick = () => document.getElementById('folderModal').classList.remove('hidden');
+
+    document.getElementById('reconnectBannerBtn').onclick = async () => {
+      for (const f of state.folders) {
+        if (f.dirHandle && f.needsPermission) {
+          await scanAndIndexDirectoryHandle(f.dirHandle, f.id);
+        }
+      }
+    };
+
+    document.getElementById('grantHandleOverlayBtn').onclick = async () => {
+      if (!state.activeVideo) return;
+      const folder = state.folders.find(f => f.id === state.activeVideo.folderId);
+      if (folder && folder.dirHandle) {
+        await scanAndIndexDirectoryHandle(folder.dirHandle, folder.id);
+      }
+      await playVideoById(state.activeVideo.id, state.playerMode);
+    };
+
+    document.getElementById('toggleSidebarBtn').onclick = () => {
+      document.getElementById('sidebar').classList.toggle('hidden');
+    };
+    document.getElementById('brandHomeBtn').onclick = () => {
+      if (state.playerMode === 'watch') switchPlayerMode('mini');
+      state.navSection = 'all';
+      state.selectedActor = null;
+      state.selectedCategory = 'All';
+      renderAll();
+    };
+
+    const searchInput = document.getElementById('searchInput');
+    const clearSearchBtn = document.getElementById('clearSearchBtn');
+    searchInput.oninput = (e) => {
+      state.searchQuery = e.target.value;
+      clearSearchBtn.classList.toggle('hidden', !state.searchQuery);
+      if (state.playerMode === 'watch') switchPlayerMode('mini');
+      renderAll();
+    };
+    clearSearchBtn.onclick = () => {
+      state.searchQuery = '';
+      searchInput.value = '';
+      clearSearchBtn.classList.add('hidden');
+      renderAll();
+    };
+
+    document.getElementById('sortSelect').onchange = (e) => {
+      state.sortBy = e.target.value;
+      renderAll();
+    };
+    document.getElementById('resetActorBtn').onclick = () => {
+      state.selectedActor = null;
+      renderAll();
+    };
+
+    // Player Buttons (Including Previous / Next Video)
+    document.getElementById('prevVideoBtn').onclick = () => playAdjacentVideo(-1);
+    document.getElementById('nextVideoBtn').onclick = () => playAdjacentVideo(1);
+    document.getElementById('watchPrevBarBtn').onclick = () => playAdjacentVideo(-1);
+    document.getElementById('watchNextBarBtn').onclick = () => playAdjacentVideo(1);
+    document.getElementById('miniPrevBtn').onclick = () => playAdjacentVideo(-1);
+    document.getElementById('miniNextBtn').onclick = () => playAdjacentVideo(1);
+
+    document.getElementById('autoplayNextToggle').onchange = (e) => {
+      state.autoplayNext = e.target.checked;
+      showToast(state.autoplayNext ? 'Autoplay Next enabled' : 'Autoplay Next disabled');
+    };
+
+    document.getElementById('playPauseBtn').onclick = togglePlayPause;
+    document.getElementById('seekBackBtn').onclick = () => seekBySeconds(-5);
+    document.getElementById('seekFwdBtn').onclick = () => seekBySeconds(5);
+    document.getElementById('muteBtn').onclick = toggleMute;
+    document.getElementById('volumeSlider').oninput = (e) => {
+      const val = parseFloat(e.target.value);
+      state.volume = val;
+      state.isMuted = val === 0;
+      mainVideo.volume = val;
+      mainVideo.muted = state.isMuted;
+      syncVolumeUI();
+    };
+    document.getElementById('speedSelect').onchange = (e) => {
+      mainVideo.playbackRate = parseFloat(e.target.value);
+    };
+    document.getElementById('fullscreenBtn').onclick = () => {
+      const box = document.getElementById('playerBox');
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else if (box.requestFullscreen) box.requestFullscreen().catch(() => {});
+    };
+
+    document.getElementById('backToBrowseBtn').onclick = () => switchPlayerMode('mini');
+    document.getElementById('dockMiniBtn').onclick = () => switchPlayerMode('mini');
+    document.getElementById('expandFromMiniBtn').onclick = () => switchPlayerMode('watch');
+    document.getElementById('miniFooter').onclick = () => switchPlayerMode('watch');
+    document.getElementById('closeMiniBtn').onclick = () => {
+      persistCurrentVideoProgress(0);
+      mainVideo.pause();
+      state.playerMode = 'hidden';
+      renderPlayerLayout();
+    };
+    document.getElementById('theaterBtn').onclick = () => {
+      state.theaterWide = !state.theaterWide;
+      document.getElementById('theaterBtn').textContent = state.theaterWide ? 'Default View' : 'Theater Mode';
+      renderPlayerLayout();
+    };
+
+    document.getElementById('watchLikeBtn').onclick = () => {
+      if (state.activeVideo) handleReaction(state.activeVideo.id, 'like');
+    };
+    document.getElementById('watchDislikeBtn').onclick = () => {
+      if (state.activeVideo) handleReaction(state.activeVideo.id, 'dislike');
+    };
+    document.getElementById('watchEditBtn').onclick = () => {
+      if (state.activeVideo) openEditModal(state.activeVideo);
+    };
+
+    // Modals
+    document.getElementById('openFolderModalBtn').onclick = () => document.getElementById('folderModal').classList.remove('hidden');
+    document.getElementById('closeFolderModalBtn').onclick = () => document.getElementById('folderModal').classList.add('hidden');
+    document.getElementById('closeEditModalBtn').onclick = () => document.getElementById('editModal').classList.add('hidden');
+    document.getElementById('cancelEditBtn').onclick = () => document.getElementById('editModal').classList.add('hidden');
+
+    document.getElementById('editForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const v = state.videos.find(x => x.id === state.editingVideoId);
+      if (!v) return;
+      v.title = document.getElementById('editTitleInput').value.trim();
+      const actorsRaw = document.getElementById('editActorsInput').value.split(',').map(s => s.trim()).filter(Boolean);
+      v.actors = actorsRaw.length ? actorsRaw : ['Unknown Cast'];
+      v.category = document.getElementById('editCategoryInput').value.trim() || 'Library';
+      await dbPut('videos', v);
+      document.getElementById('editModal').classList.add('hidden');
+      showToast('Metadata saved locally!');
+      renderAll();
+    };
+
+    // Initialize Application & Check Saved Native Handles
+    (async function init() {
+      const savedFolders = await dbGetAll('folders');
+      const savedVideos = await dbGetAll('videos');
+
+      if (savedVideos.length > 0) {
+        state.folders = savedFolders.length ? savedFolders : INITIAL_FOLDERS;
+        for (const f of state.folders) {
+          if (f.dirHandle) {
+            try {
+              const perm = await f.dirHandle.queryPermission({ mode: 'read' });
+              f.needsPermission = perm !== 'granted';
+              f.status = perm === 'granted'
+                ? 'Connected (0 Bytes Uploaded • Native Local Handle)'
+                : 'Index Cached Locally (Click ⚡ Unlock to Stream)';
+            } catch (e) {
+              f.needsPermission = true;
+            }
+          }
+        }
+        state.videos = savedVideos.map(v => {
+          if (v.cachedFileBlob instanceof Blob) {
+            v.videoUrl = URL.createObjectURL(v.cachedFileBlob);
+          }
+          return v;
+        });
+      } else {
+        state.folders = INITIAL_FOLDERS;
+        state.videos = createInitialDemoVideos();
+        for (const f of state.folders) await dbPut('folders', f);
+        for (const v of state.videos) await dbPut('videos', v);
+      }
+      syncVolumeUI();
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
